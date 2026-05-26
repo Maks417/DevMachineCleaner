@@ -1,0 +1,26 @@
+[package]
+name = "dev-cleanup"
+version = "0.1.0"
+description = "Reclaim disk space by cleaning dev build artifacts and AI caches"
+authors = ["dev-cleanup"]
+edition = "2021"
+
+[lib]
+name = "dev_cleanup_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+rayon = "1"
+trash = "5"
+dirs = "5"
+anyhow = "1"
+thiserror = "2"
