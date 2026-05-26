@@ -181,7 +181,7 @@ pub fn scan_projects(
     let mut cancelled = false;
     for entry_result in walker {
         visited = visited.saturating_add(1);
-        if visited % PROGRESS_STRIDE == 0 {
+        if visited.is_multiple_of(PROGRESS_STRIDE) {
             if cancel.load(Ordering::Relaxed) {
                 cancelled = true;
                 break;
