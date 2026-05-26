@@ -7,8 +7,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-26
+
 ### Added
 
+- **Externalized project cleanup rules.** Project stack markers and cleanable
+  subdirs now live in `src-tauri/src/scanner/project_rules.toml` instead of
+  being hardcoded in `stacks.rs`. Adding a new stack or extending an existing
+  one is a TOML edit plus a rebuild.
 - **Scan-session scoped deletion authorization.** Each scan now produces a
   `scan_id` that the frontend echoes back when cleaning, replacing the
   process-wide grow-only allowlist. Stale or unknown sessions are rejected.
