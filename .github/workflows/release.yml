@@ -127,7 +127,7 @@ jobs:
 
             Items are moved to the OS Recycle Bin / Trash and remain recoverable.
 
-            See [CHANGELOG.md](https://github.com/Maks417/dev-cleanup/blob/main/CHANGELOG.md)
+            See [CHANGELOG.md](https://github.com/Maks417/DevMachineCleaner/blob/master/CHANGELOG.md)
             for the list of changes in this release.
           releaseDraft: true
           prerelease: false
