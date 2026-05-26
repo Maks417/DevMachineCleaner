@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same ref — keeps queues short.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform.name }})
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { name: linux,   os: ubuntu-22.04 }
+          - { name: macos,   os: macos-latest }
+          - { name: windows, os: windows-latest }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux WebKit + bundler deps
+        if: matrix.platform.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          # Bust the cache when these files change — Cargo.lock alone misses tauri.conf edits.
+          key: ${{ matrix.platform.name }}
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Frontend typecheck + build
+        run: npm run build
+
+      - name: Rust check (src-tauri)
+        working-directory: src-tauri
+        run: cargo check --locked --all-targets

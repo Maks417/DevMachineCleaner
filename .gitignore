@@ -16,6 +16,9 @@ dist-ssr
 .vscode
 .claude
 .idea
+
+# Claude session notes (local-only context)
+CLAUDE.md
 .DS_Store
 *.suo
 *.ntvs*
