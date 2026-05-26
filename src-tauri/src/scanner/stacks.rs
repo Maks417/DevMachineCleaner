@@ -485,9 +485,16 @@ mod tests {
                 stack.name,
             );
             for c in &stack.cleanable {
-                assert!(!c.name.is_empty(), "cleanable in {} has empty name", stack.name);
                 assert!(
-                    matches!(c.category.as_str(), "dependencies" | "build output" | "cache"),
+                    !c.name.is_empty(),
+                    "cleanable in {} has empty name",
+                    stack.name
+                );
+                assert!(
+                    matches!(
+                        c.category.as_str(),
+                        "dependencies" | "build output" | "cache"
+                    ),
                     "stack {} cleanable {} has unknown category {}",
                     stack.name,
                     c.name,
