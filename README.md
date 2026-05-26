@@ -52,9 +52,11 @@ Pick the one for your platform:
 | Platform | Artifact |
 |----------|----------|
 | Windows  | `.msi` installer or `.exe` (NSIS) |
-| macOS — Apple Silicon | `.dmg` (`aarch64`) |
-| macOS — Intel | `.dmg` (`x86_64`) |
+| macOS (Apple Silicon) | `.dmg` (`aarch64`) |
 | Linux    | `.AppImage` or `.deb` |
+
+> Intel Mac users: build from source — see below. GitHub retired the free Intel
+> macOS runner in 2026, so we no longer ship a prebuilt Intel `.dmg`.
 
 > Builds are currently **unsigned**, so on first launch Windows SmartScreen and
 > macOS Gatekeeper will warn — right-click → Open (macOS) or "More info → Run
