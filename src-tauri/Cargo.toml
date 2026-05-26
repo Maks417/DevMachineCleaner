@@ -22,7 +22,7 @@ serde = { version = "1", features = ["derive"] }
 walkdir = "2"
 rayon = "1"
 trash = "5"
-dirs = "5"
+dirs = "6"
 toml = "0.8"
 
 [dev-dependencies]
