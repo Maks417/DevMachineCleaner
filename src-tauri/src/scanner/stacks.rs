@@ -1,8 +1,8 @@
 use rayon::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use walkdir::WalkDir;
 
 use super::{dir_size, SizeStats};
@@ -23,10 +23,10 @@ pub struct CleanableDir {
     pub label: String,
     pub size_bytes: u64,
     /// Coarse classification used by the UI to explain what will be reclaimed.
-    pub category: &'static str,
+    pub category: String,
     /// Short one-liner describing what regenerates the path. Helps users
     /// decide whether to clean it.
-    pub note: &'static str,
+    pub note: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -65,382 +65,59 @@ pub fn never_cancel() -> Arc<AtomicBool> {
     Arc::new(AtomicBool::new(false))
 }
 
-/// Directories we never descend into (either we'd be re-scanning what we
-/// already classify, or it's noise like `.git`).
-const SKIP_DIR_NAMES: &[&str] = &[
-    ".git",
-    ".hg",
-    ".svn",
-    "node_modules",
-    "target",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".next",
-    ".nuxt",
-    ".turbo",
-    ".cache",
-    ".parcel-cache",
-    ".svelte-kit",
-    ".dart_tool",
-    ".gradle",
-    "bin",
-    "obj",
-    "DerivedData",
-    "vendor",
-    ".terraform",
-    ".build",
-    "Library",
-    "Intermediate",
-    "Binaries",
-];
+/// Raw TOML source for the project cleanup rules. Bundled into the binary so
+/// the file does not need to ship alongside the executable; rebuild after
+/// editing it. The single source of truth for what the scanner detects and
+/// what it offers to reclaim — add a new stack or cleanable there, not here.
+const PROJECT_RULES_TOML: &str = include_str!("project_rules.toml");
 
-/// A cleanable subdirectory pattern for a stack. The static metadata is
-/// surfaced to the UI alongside the resolved size.
-#[derive(Debug, Clone, Copy)]
+/// A cleanable subdirectory pattern for a stack. Deserialized from
+/// `project_rules.toml` and held for the lifetime of the process via
+/// [`project_rules`].
+#[derive(Debug, Clone, Deserialize)]
 struct Cleanable {
-    name: &'static str,
-    category: &'static str,
-    note: &'static str,
+    name: String,
+    category: String,
+    note: String,
 }
 
-const CAT_DEPS: &str = "dependencies";
-const CAT_BUILD: &str = "build output";
-const CAT_CACHE: &str = "cache";
-
-const NOTE_REINSTALL: &str = "Regenerated when you next install dependencies.";
-const NOTE_REBUILD: &str = "Regenerated on the next build.";
-const NOTE_TOOL_CACHE: &str = "Tool cache; will be repopulated on next use.";
-
+/// One project stack definition loaded from `project_rules.toml`.
+#[derive(Debug, Clone, Deserialize)]
 struct StackRule {
-    name: &'static str,
+    name: String,
     /// Marker files that, when present in a directory, identify the stack.
-    markers: &'static [&'static str],
+    #[serde(default)]
+    markers: Vec<String>,
     /// File-name suffixes (extensions); any file matching identifies the stack.
-    marker_exts: &'static [&'static str],
+    #[serde(default)]
+    marker_exts: Vec<String>,
     /// Subdirs (relative to project root) that are safe to clean.
-    cleanable: &'static [Cleanable],
+    #[serde(default)]
+    cleanable: Vec<Cleanable>,
 }
 
-const STACK_RULES: &[StackRule] = &[
-    StackRule {
-        name: "Node.js",
-        markers: &["package.json"],
-        marker_exts: &[],
-        cleanable: &[
-            Cleanable {
-                name: "node_modules",
-                category: CAT_DEPS,
-                note: NOTE_REINSTALL,
-            },
-            Cleanable {
-                name: ".next",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: ".nuxt",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: ".turbo",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-            Cleanable {
-                name: ".cache",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-            Cleanable {
-                name: ".parcel-cache",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-            Cleanable {
-                name: ".svelte-kit",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "dist",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "build",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "out",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: ".vite",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-        ],
-    },
-    StackRule {
-        name: "Rust",
-        markers: &["Cargo.toml"],
-        marker_exts: &[],
-        cleanable: &[Cleanable {
-            name: "target",
-            category: CAT_BUILD,
-            note: NOTE_REBUILD,
-        }],
-    },
-    StackRule {
-        name: "Python",
-        markers: &["pyproject.toml", "requirements.txt", "setup.py", "Pipfile"],
-        marker_exts: &[],
-        cleanable: &[
-            Cleanable {
-                name: ".venv",
-                category: CAT_DEPS,
-                note: NOTE_REINSTALL,
-            },
-            Cleanable {
-                name: "venv",
-                category: CAT_DEPS,
-                note: NOTE_REINSTALL,
-            },
-            Cleanable {
-                name: "env",
-                category: CAT_DEPS,
-                note: NOTE_REINSTALL,
-            },
-            Cleanable {
-                name: ".pytest_cache",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-            Cleanable {
-                name: ".mypy_cache",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-            Cleanable {
-                name: ".ruff_cache",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-            Cleanable {
-                name: ".tox",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-            Cleanable {
-                name: "build",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "dist",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: ".eggs",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-        ],
-    },
-    StackRule {
-        name: "Go",
-        markers: &["go.mod"],
-        marker_exts: &[],
-        cleanable: &[
-            Cleanable {
-                name: "bin",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "vendor",
-                category: CAT_DEPS,
-                note: NOTE_REINSTALL,
-            },
-        ],
-    },
-    StackRule {
-        name: "Java/Maven",
-        markers: &["pom.xml"],
-        marker_exts: &[],
-        cleanable: &[Cleanable {
-            name: "target",
-            category: CAT_BUILD,
-            note: NOTE_REBUILD,
-        }],
-    },
-    StackRule {
-        name: "Java/Gradle",
-        markers: &[
-            "build.gradle",
-            "build.gradle.kts",
-            "settings.gradle",
-            "settings.gradle.kts",
-        ],
-        marker_exts: &[],
-        cleanable: &[
-            Cleanable {
-                name: "build",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: ".gradle",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-        ],
-    },
-    StackRule {
-        name: ".NET",
-        markers: &[],
-        marker_exts: &[".csproj", ".fsproj", ".vbproj", ".sln"],
-        cleanable: &[
-            Cleanable {
-                name: "bin",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "obj",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-        ],
-    },
-    StackRule {
-        name: "Flutter/Dart",
-        markers: &["pubspec.yaml"],
-        marker_exts: &[],
-        cleanable: &[
-            Cleanable {
-                name: "build",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: ".dart_tool",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-        ],
-    },
-    StackRule {
-        name: "Xcode",
-        markers: &[],
-        marker_exts: &[".xcodeproj", ".xcworkspace"],
-        cleanable: &[
-            Cleanable {
-                name: "build",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "DerivedData",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-        ],
-    },
-    StackRule {
-        name: "PHP/Composer",
-        markers: &["composer.json"],
-        marker_exts: &[],
-        cleanable: &[Cleanable {
-            name: "vendor",
-            category: CAT_DEPS,
-            note: NOTE_REINSTALL,
-        }],
-    },
-    StackRule {
-        name: "Ruby/Bundler",
-        markers: &["Gemfile"],
-        marker_exts: &[],
-        cleanable: &[
-            Cleanable {
-                name: ".bundle",
-                category: CAT_CACHE,
-                note: NOTE_TOOL_CACHE,
-            },
-            Cleanable {
-                name: "vendor/bundle",
-                category: CAT_DEPS,
-                note: NOTE_REINSTALL,
-            },
-        ],
-    },
-    StackRule {
-        name: "Swift/SPM",
-        markers: &["Package.swift"],
-        marker_exts: &[],
-        cleanable: &[Cleanable {
-            name: ".build",
-            category: CAT_BUILD,
-            note: NOTE_REBUILD,
-        }],
-    },
-    StackRule {
-        name: "Terraform",
-        markers: &[],
-        marker_exts: &[".tf"],
-        cleanable: &[Cleanable {
-            name: ".terraform",
-            category: CAT_CACHE,
-            note: NOTE_TOOL_CACHE,
-        }],
-    },
-    StackRule {
-        name: "CMake",
-        markers: &["CMakeLists.txt"],
-        marker_exts: &[],
-        cleanable: &[
-            Cleanable {
-                name: "build",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "cmake-build-debug",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-            Cleanable {
-                name: "cmake-build-release",
-                category: CAT_BUILD,
-                note: NOTE_REBUILD,
-            },
-        ],
-    },
-    StackRule {
-        name: "Bun",
-        markers: &["bun.lockb", "bunfig.toml"],
-        marker_exts: &[],
-        cleanable: &[Cleanable {
-            name: "node_modules",
-            category: CAT_DEPS,
-            note: NOTE_REINSTALL,
-        }],
-    },
-    StackRule {
-        name: "Deno",
-        markers: &["deno.json", "deno.jsonc"],
-        marker_exts: &[],
-        cleanable: &[],
-    },
-];
+/// Top-level structure of `project_rules.toml`. See the file for the schema.
+#[derive(Debug, Deserialize)]
+struct ProjectRules {
+    /// Directories the discovery walker never descends into (either we'd be
+    /// re-scanning what we already classify, or it's noise like `.git`).
+    skip_dir_names: Vec<String>,
+    stacks: Vec<StackRule>,
+}
+
+/// Parse `project_rules.toml` once and return the cached result. A malformed
+/// rules file is a build/config bug — fail loudly rather than fall back to
+/// a silently-empty rule set.
+fn project_rules() -> &'static ProjectRules {
+    static RULES: OnceLock<ProjectRules> = OnceLock::new();
+    RULES.get_or_init(|| {
+        toml::from_str(PROJECT_RULES_TOML)
+            .expect("project_rules.toml is malformed; fix the file and rebuild")
+    })
+}
 
 fn detect_stacks_in(dir: &Path) -> (Vec<&'static StackRule>, bool) {
-    let mut found: Vec<&StackRule> = Vec::new();
+    let mut found: Vec<&'static StackRule> = Vec::new();
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return (found, true),
@@ -450,12 +127,12 @@ fn detect_stacks_in(dir: &Path) -> (Vec<&'static StackRule>, bool) {
         .filter_map(|e| e.file_name().into_string().ok())
         .collect();
 
-    for rule in STACK_RULES {
+    for rule in &project_rules().stacks {
         let marker_hit = rule.markers.iter().any(|m| names.iter().any(|n| n == m));
         let ext_hit = rule
             .marker_exts
             .iter()
-            .any(|ext| names.iter().any(|n| n.ends_with(ext)));
+            .any(|ext| names.iter().any(|n| n.ends_with(ext.as_str())));
         if marker_hit || ext_hit {
             found.push(rule);
         }
@@ -482,6 +159,7 @@ pub fn scan_projects(
     let discovery_errors = AtomicU64::new(0);
     let mut hits: Vec<(PathBuf, Vec<&'static StackRule>)> = Vec::new();
 
+    let skip_dir_names = &project_rules().skip_dir_names;
     let walker = WalkDir::new(root)
         .follow_links(false)
         .max_depth(max_depth)
@@ -491,7 +169,7 @@ pub fn scan_projects(
                 return true;
             }
             let name = e.file_name().to_string_lossy();
-            !SKIP_DIR_NAMES.iter().any(|s| *s == name.as_ref())
+            !skip_dir_names.iter().any(|s| s == name.as_ref())
         });
 
     progress(ScanProgress {
@@ -536,17 +214,17 @@ pub fn scan_projects(
     // Flatten to one granular parallel layer keyed by cleanable directory.
     // Each unit of work is one `dir_size` walk; rayon's work-stealing
     // scheduler decides how to spread them across the thread pool.
-    let units: Vec<(usize, Cleanable)> = hits
+    let units: Vec<(usize, &'static Cleanable)> = hits
         .iter()
         .enumerate()
         .flat_map(|(idx, (_, rules))| {
             // Union of cleanable subdir descriptors across the matched stacks,
             // deduplicated by name (first occurrence wins).
-            let mut seen: Vec<&'static str> = Vec::new();
-            let mut chosen: Vec<Cleanable> = Vec::new();
-            for c in rules.iter().flat_map(|r| r.cleanable.iter().copied()) {
-                if !seen.contains(&c.name) {
-                    seen.push(c.name);
+            let mut seen: Vec<&str> = Vec::new();
+            let mut chosen: Vec<&'static Cleanable> = Vec::new();
+            for c in rules.iter().flat_map(|r| r.cleanable.iter()) {
+                if !seen.contains(&c.name.as_str()) {
+                    seen.push(c.name.as_str());
                     chosen.push(c);
                 }
             }
@@ -568,7 +246,7 @@ pub fn scan_projects(
             if cancel.load(Ordering::Relaxed) {
                 return None;
             }
-            let p = hits[idx].0.join(c.name);
+            let p = hits[idx].0.join(&c.name);
             if !p.exists() {
                 let done = sized_counter.fetch_add(1, Ordering::Relaxed) + 1;
                 progress(ScanProgress {
@@ -599,10 +277,10 @@ pub fn scan_projects(
                 idx,
                 CleanableDir {
                     path: normalized.to_string_lossy().into_owned(),
-                    label: c.name.to_string(),
+                    label: c.name.clone(),
                     size_bytes: stats.bytes,
-                    category: c.category,
-                    note: c.note,
+                    category: c.category.clone(),
+                    note: c.note.clone(),
                 },
                 stats,
             ))
@@ -624,7 +302,7 @@ pub fn scan_projects(
         .into_iter()
         .zip(buckets)
         .map(|((dir, rules), cleanable)| {
-            let stacks: Vec<String> = rules.iter().map(|r| r.name.to_string()).collect();
+            let stacks: Vec<String> = rules.iter().map(|r| r.name.clone()).collect();
             let total: u64 = cleanable.iter().map(|c| c.size_bytes).sum();
             let name = dir
                 .file_name()
@@ -783,8 +461,46 @@ mod tests {
 
         let scan = run_scan(tmp.path(), 4);
         let c = &scan.projects[0].cleanable[0];
-        assert_eq!(c.category, CAT_DEPS);
+        assert_eq!(c.category, "dependencies");
         assert!(!c.note.is_empty());
+    }
+
+    #[test]
+    fn project_rules_toml_parses_and_is_non_empty() {
+        let rules = project_rules();
+        assert!(
+            !rules.skip_dir_names.is_empty(),
+            "project_rules.toml must declare at least one skip dir name",
+        );
+        assert!(
+            !rules.stacks.is_empty(),
+            "project_rules.toml must declare at least one stack",
+        );
+
+        for stack in &rules.stacks {
+            assert!(!stack.name.is_empty(), "stack name must not be empty");
+            assert!(
+                !stack.markers.is_empty() || !stack.marker_exts.is_empty(),
+                "stack {} must declare markers or marker_exts",
+                stack.name,
+            );
+            for c in &stack.cleanable {
+                assert!(!c.name.is_empty(), "cleanable in {} has empty name", stack.name);
+                assert!(
+                    matches!(c.category.as_str(), "dependencies" | "build output" | "cache"),
+                    "stack {} cleanable {} has unknown category {}",
+                    stack.name,
+                    c.name,
+                    c.category,
+                );
+                assert!(
+                    !c.note.is_empty(),
+                    "cleanable {} in {} must have a note",
+                    c.name,
+                    stack.name,
+                );
+            }
+        }
     }
 
     #[test]

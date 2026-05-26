@@ -1,0 +1,350 @@
+# Project cleanup rules.
+#
+# This file is the single source of truth for which developer-project folders
+# the scanner detects and which sub-directories it offers to reclaim. Edit it
+# to add a new stack or extend the cleanable list for an existing one — no
+# Rust changes required (the file is `include_str!`-bundled into the binary
+# at build time, so a rebuild is still needed).
+#
+# Schema:
+#   skip_dir_names = [..]      # Names the discovery walker will never descend
+#                              # into. Add entries here when introducing a
+#                              # cleanable that is large and could otherwise
+#                              # be re-scanned recursively.
+#
+#   [[stacks]]
+#   name        = "..."        # Stack label shown in the UI.
+#   markers     = ["..."]      # Exact file names that identify the stack.
+#   marker_exts = ["..."]      # File-name suffixes (extensions) that identify
+#                              # the stack; any one match is enough.
+#
+#   [[stacks.cleanable]]
+#   name     = "node_modules"  # Sub-directory (relative to the project root)
+#                              # that can be safely deleted.
+#   category = "dependencies"  # One of: "dependencies", "build output", "cache".
+#   note     = "..."           # Short explanation surfaced in the UI.
+#
+# Only paths that the tool itself will recreate on next use belong here.
+
+skip_dir_names = [
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".next",
+    ".nuxt",
+    ".turbo",
+    ".cache",
+    ".parcel-cache",
+    ".svelte-kit",
+    ".dart_tool",
+    ".gradle",
+    "bin",
+    "obj",
+    "DerivedData",
+    "vendor",
+    ".terraform",
+    ".build",
+    "Library",
+    "Intermediate",
+    "Binaries",
+]
+
+[[stacks]]
+name = "Node.js"
+markers = ["package.json"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "node_modules"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks.cleanable]]
+name = ".next"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = ".nuxt"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = ".turbo"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks.cleanable]]
+name = ".cache"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks.cleanable]]
+name = ".parcel-cache"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks.cleanable]]
+name = ".svelte-kit"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "dist"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "build"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "out"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = ".vite"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks]]
+name = "Rust"
+markers = ["Cargo.toml"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "target"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks]]
+name = "Python"
+markers = ["pyproject.toml", "requirements.txt", "setup.py", "Pipfile"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = ".venv"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks.cleanable]]
+name = "venv"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks.cleanable]]
+name = "env"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks.cleanable]]
+name = ".pytest_cache"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks.cleanable]]
+name = ".mypy_cache"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks.cleanable]]
+name = ".ruff_cache"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks.cleanable]]
+name = ".tox"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks.cleanable]]
+name = "build"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "dist"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = ".eggs"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks]]
+name = "Go"
+markers = ["go.mod"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "bin"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "vendor"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks]]
+name = "Java/Maven"
+markers = ["pom.xml"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "target"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks]]
+name = "Java/Gradle"
+markers = [
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts",
+]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "build"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = ".gradle"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks]]
+name = ".NET"
+markers = []
+marker_exts = [".csproj", ".fsproj", ".vbproj", ".sln"]
+
+[[stacks.cleanable]]
+name = "bin"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "obj"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks]]
+name = "Flutter/Dart"
+markers = ["pubspec.yaml"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "build"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = ".dart_tool"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks]]
+name = "Xcode"
+markers = []
+marker_exts = [".xcodeproj", ".xcworkspace"]
+
+[[stacks.cleanable]]
+name = "build"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "DerivedData"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks]]
+name = "PHP/Composer"
+markers = ["composer.json"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "vendor"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks]]
+name = "Ruby/Bundler"
+markers = ["Gemfile"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = ".bundle"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks.cleanable]]
+name = "vendor/bundle"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks]]
+name = "Swift/SPM"
+markers = ["Package.swift"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = ".build"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks]]
+name = "Terraform"
+markers = []
+marker_exts = [".tf"]
+
+[[stacks.cleanable]]
+name = ".terraform"
+category = "cache"
+note = "Tool cache; will be repopulated on next use."
+
+[[stacks]]
+name = "CMake"
+markers = ["CMakeLists.txt"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "build"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "cmake-build-debug"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks.cleanable]]
+name = "cmake-build-release"
+category = "build output"
+note = "Regenerated on the next build."
+
+[[stacks]]
+name = "Bun"
+markers = ["bun.lockb", "bunfig.toml"]
+marker_exts = []
+
+[[stacks.cleanable]]
+name = "node_modules"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks]]
+name = "Deno"
+markers = ["deno.json", "deno.jsonc"]
+marker_exts = []
