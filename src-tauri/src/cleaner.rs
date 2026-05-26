@@ -1,5 +1,6 @@
 use serde::Serialize;
-use std::path::Path;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CleanResult {
@@ -8,32 +9,45 @@ pub struct CleanResult {
     pub error: Option<String>,
 }
 
-/// Move the given paths to the OS trash/recycle bin. Errors on individual
-/// paths are captured per-entry rather than aborting the batch.
-pub fn clean_paths(paths: Vec<String>) -> Vec<CleanResult> {
-    paths
-        .into_iter()
-        .map(|p| {
-            let path = Path::new(&p);
-            if !path.exists() {
-                return CleanResult {
-                    path: p,
-                    ok: false,
-                    error: Some("Path does not exist".into()),
-                };
-            }
-            match trash::delete(path) {
-                Ok(()) => CleanResult {
-                    path: p,
-                    ok: true,
-                    error: None,
-                },
-                Err(e) => CleanResult {
-                    path: p,
-                    ok: false,
-                    error: Some(e.to_string()),
-                },
-            }
-        })
-        .collect()
+/// Move the given paths to the OS trash/recycle bin. Each path is canonicalized
+/// and checked against the backend allowlist before deletion, so a compromised
+/// WebView cannot trash arbitrary user data through this command. Per-path
+/// errors are captured rather than aborting the batch.
+pub fn clean_paths(paths: Vec<String>, allow: &HashSet<PathBuf>) -> Vec<CleanResult> {
+    paths.into_iter().map(|p| clean_one(p, allow)).collect()
+}
+
+fn clean_one(input: String, allow: &HashSet<PathBuf>) -> CleanResult {
+    let raw = Path::new(&input);
+    let canonical = match std::fs::canonicalize(raw) {
+        Ok(c) => c,
+        Err(e) => {
+            return CleanResult {
+                path: input,
+                ok: false,
+                error: Some(format!("Cannot resolve path: {e}")),
+            };
+        }
+    };
+
+    if !allow.contains(&canonical) {
+        return CleanResult {
+            path: input,
+            ok: false,
+            error: Some("Path not produced by a recent scan; refusing to delete".into()),
+        };
+    }
+
+    match trash::delete(&canonical) {
+        Ok(()) => CleanResult {
+            path: input,
+            ok: true,
+            error: None,
+        },
+        Err(e) => CleanResult {
+            path: input,
+            ok: false,
+            error: Some(e.to_string()),
+        },
+    }
 }

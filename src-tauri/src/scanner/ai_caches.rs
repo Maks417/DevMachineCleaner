@@ -207,25 +207,26 @@ const SPECS: &[CacheSpec] = &[
 ];
 
 pub fn list_ai_caches() -> Vec<AiCacheEntry> {
-    SPECS
-        .par_iter()
-        .flat_map(|spec| {
-            let paths = (spec.paths)();
-            paths
-                .into_par_iter()
-                .map(|p| {
-                    let exists = p.exists();
-                    let size = if exists { dir_size(&p) } else { 0 };
-                    AiCacheEntry {
-                        id: spec.id.to_string(),
-                        name: spec.name.to_string(),
-                        path: p.to_string_lossy().into_owned(),
-                        exists,
-                        size_bytes: size,
-                        note: spec.note.to_string(),
-                    }
-                })
-                .collect::<Vec<_>>()
+    // Flatten (spec, path) pairs to a single granular parallel layer rather
+    // than nesting rayon. Each unit is one `dir_size` walk.
+    let units: Vec<(&'static CacheSpec, PathBuf)> = SPECS
+        .iter()
+        .flat_map(|spec| (spec.paths)().into_iter().map(move |p| (spec, p)))
+        .collect();
+
+    units
+        .into_par_iter()
+        .map(|(spec, p)| {
+            let exists = p.exists();
+            let size = if exists { dir_size(&p) } else { 0 };
+            AiCacheEntry {
+                id: spec.id.to_string(),
+                name: spec.name.to_string(),
+                path: p.to_string_lossy().into_owned(),
+                exists,
+                size_bytes: size,
+                note: spec.note.to_string(),
+            }
         })
         .collect()
 }

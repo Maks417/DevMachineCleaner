@@ -24,11 +24,24 @@ pub struct DetectedProject {
 /// Directories we never descend into (either we'd be re-scanning what we
 /// already classify, or it's noise like `.git`).
 const SKIP_DIR_NAMES: &[&str] = &[
-    ".git", ".hg", ".svn",
-    "node_modules", "target", ".venv", "venv", "__pycache__",
-    ".next", ".nuxt", ".turbo", ".cache", ".parcel-cache",
-    ".svelte-kit", ".dart_tool", ".gradle",
-    "bin", "obj",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    "target",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".next",
+    ".nuxt",
+    ".turbo",
+    ".cache",
+    ".parcel-cache",
+    ".svelte-kit",
+    ".dart_tool",
+    ".gradle",
+    "bin",
+    "obj",
     "DerivedData",
 ];
 
@@ -98,7 +111,12 @@ const STACK_RULES: &[StackRule] = &[
     },
     StackRule {
         name: "Java/Gradle",
-        markers: &["build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"],
+        markers: &[
+            "build.gradle",
+            "build.gradle.kts",
+            "settings.gradle",
+            "settings.gradle.kts",
+        ],
         marker_exts: &[],
         cleanable: &["build", ".gradle"],
     },
@@ -150,7 +168,9 @@ fn detect_stacks_in(dir: &Path) -> Vec<&'static StackRule> {
 /// a dir matching multiple stacks (e.g. a polyglot repo) collapses to one entry
 /// listing all matching stacks and the union of their cleanable dirs.
 pub fn scan_projects(root: &Path, max_depth: usize) -> Vec<DetectedProject> {
-    let mut project_dirs: Vec<PathBuf> = Vec::new();
+    // Discovery pass: walk the tree, record (dir, matched rules) so we don't
+    // re-run `detect_stacks_in` for the same directory later.
+    let mut hits: Vec<(PathBuf, Vec<&'static StackRule>)> = Vec::new();
 
     let walker = WalkDir::new(root)
         .follow_links(false)
@@ -169,54 +189,71 @@ pub fn scan_projects(root: &Path, max_depth: usize) -> Vec<DetectedProject> {
         if !entry.file_type().is_dir() {
             continue;
         }
-        if !detect_stacks_in(entry.path()).is_empty() {
-            project_dirs.push(entry.path().to_path_buf());
+        let rules = detect_stacks_in(entry.path());
+        if !rules.is_empty() {
+            hits.push((entry.path().to_path_buf(), rules));
         }
     }
 
-    // For each project dir, compute cleanable dirs + sizes in parallel.
-    project_dirs
-        .par_iter()
-        .map(|dir| build_project(dir))
-        .collect()
-}
+    // Flatten to one granular parallel layer keyed by cleanable directory.
+    // Each unit of work is one `dir_size` walk; rayon's work-stealing
+    // scheduler decides how to spread them across the thread pool.
+    let units: Vec<(usize, &'static str)> = hits
+        .iter()
+        .enumerate()
+        .flat_map(|(idx, (_, rules))| {
+            // Union of cleanable subdir names across the matched stacks, deduplicated.
+            let mut names: Vec<&'static str> = rules
+                .iter()
+                .flat_map(|r| r.cleanable.iter().copied())
+                .collect();
+            names.sort();
+            names.dedup();
+            names.into_iter().map(move |n| (idx, n))
+        })
+        .collect();
 
-fn build_project(dir: &Path) -> DetectedProject {
-    let rules = detect_stacks_in(dir);
-    let stacks: Vec<String> = rules.iter().map(|r| r.name.to_string()).collect();
-
-    // Union of cleanable dir names across all matched stacks, deduplicated.
-    let mut names: Vec<&str> = rules.iter().flat_map(|r| r.cleanable.iter().copied()).collect();
-    names.sort();
-    names.dedup();
-
-    let cleanable: Vec<CleanableDir> = names
-        .par_iter()
-        .filter_map(|name| {
-            let p = dir.join(name);
+    let sized: Vec<(usize, CleanableDir)> = units
+        .into_par_iter()
+        .filter_map(|(idx, name)| {
+            let p = hits[idx].0.join(name);
             if !p.exists() {
                 return None;
             }
             let size = dir_size(&p);
-            Some(CleanableDir {
-                path: p.to_string_lossy().into_owned(),
-                label: name.to_string(),
-                size_bytes: size,
-            })
+            Some((
+                idx,
+                CleanableDir {
+                    path: p.to_string_lossy().into_owned(),
+                    label: name.to_string(),
+                    size_bytes: size,
+                },
+            ))
         })
         .collect();
 
-    let total: u64 = cleanable.iter().map(|c| c.size_bytes).sum();
-    let name = dir
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| dir.to_string_lossy().into_owned());
-
-    DetectedProject {
-        path: dir.to_string_lossy().into_owned(),
-        name,
-        stacks,
-        cleanable,
-        total_cleanable_bytes: total,
+    // Stitch sized cleanables back onto each project.
+    let mut buckets: Vec<Vec<CleanableDir>> = hits.iter().map(|_| Vec::new()).collect();
+    for (idx, c) in sized {
+        buckets[idx].push(c);
     }
+
+    hits.into_iter()
+        .zip(buckets)
+        .map(|((dir, rules), cleanable)| {
+            let stacks: Vec<String> = rules.iter().map(|r| r.name.to_string()).collect();
+            let total: u64 = cleanable.iter().map(|c| c.size_bytes).sum();
+            let name = dir
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| dir.to_string_lossy().into_owned());
+            DetectedProject {
+                path: dir.to_string_lossy().into_owned(),
+                name,
+                stacks,
+                cleanable,
+                total_cleanable_bytes: total,
+            }
+        })
+        .collect()
 }

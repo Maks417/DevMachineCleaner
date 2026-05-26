@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cleanPaths,
   scanProjects,
   type DetectedProject,
 } from "../lib/ipc";
 import { formatBytes } from "../lib/format";
+import { CleanableRow } from "./CleanableRow";
 
 interface Props {
   root: string | null;
@@ -19,6 +20,9 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
   const [success, setSuccess] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [stackFilter, setStackFilter] = useState<string | null>(null);
+  // Monotonically increasing scan id used to drop stale results when the user
+  // rescans rapidly or switches roots mid-scan.
+  const scanIdRef = useRef(0);
 
   // Aggregate stacks across all scanned projects with counts and totals.
   const stackStats = useMemo(() => {
@@ -44,21 +48,30 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
     [projects, stackFilter],
   );
 
-  const totalSelectedBytes = useMemo(
-    () =>
-      visibleProjects
-        .flatMap((p) => p.cleanable)
-        .filter((c) => selected.has(c.path))
-        .reduce((acc, c) => acc + c.size_bytes, 0),
-    [visibleProjects, selected],
-  );
+  // Sum of `size_bytes` per cleanable path across all loaded projects. Cached
+  // so totalSelectedBytes can be computed in O(selected) instead of scanning
+  // every visible row on every selection change.
+  const sizeByPath = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of projects) {
+      for (const c of p.cleanable) map.set(c.path, c.size_bytes);
+    }
+    return map;
+  }, [projects]);
+
+  const totalSelectedBytes = useMemo(() => {
+    let total = 0;
+    for (const path of selected) total += sizeByPath.get(path) ?? 0;
+    return total;
+  }, [selected, sizeByPath]);
 
   const grandTotal = useMemo(
     () => visibleProjects.reduce((acc, p) => acc + p.total_cleanable_bytes, 0),
     [visibleProjects],
   );
 
-  const runScan = async (target: string) => {
+  const runScan = useCallback(async (target: string) => {
+    const myId = ++scanIdRef.current;
     setScanning(true);
     setError(null);
     setSuccess(null);
@@ -66,6 +79,7 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
     setStackFilter(null);
     try {
       const result = await scanProjects(target);
+      if (scanIdRef.current !== myId) return;
       // Hide projects with nothing to reclaim, sort by size desc.
       const filtered = result
         .map((p) => ({
@@ -76,27 +90,31 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
         .sort((a, b) => b.total_cleanable_bytes - a.total_cleanable_bytes);
       setProjects(filtered);
     } catch (e) {
+      if (scanIdRef.current !== myId) return;
       setError(String(e));
     } finally {
-      setScanning(false);
+      if (scanIdRef.current === myId) setScanning(false);
     }
-  };
+  }, []);
 
   // Auto-scan whenever the selected root changes.
   useEffect(() => {
-    if (root) runScan(root);
-    else setProjects([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [root]);
+    if (root) {
+      void runScan(root);
+    } else {
+      scanIdRef.current++;
+      setProjects([]);
+    }
+  }, [root, runScan]);
 
-  const toggle = (path: string) => {
+  const toggle = useCallback((path: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
       else next.add(path);
       return next;
     });
-  };
+  }, []);
 
   const selectAll = () => {
     setSelected(new Set(visibleProjects.flatMap((p) => p.cleanable.map((c) => c.path))));
@@ -114,12 +132,6 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
       }`,
     );
     if (!ok) return;
-
-    // Size lookup for each selected path — captured before refresh wipes state.
-    const sizeByPath = new Map<string, number>();
-    for (const p of projects) {
-      for (const c of p.cleanable) sizeByPath.set(c.path, c.size_bytes);
-    }
 
     setCleaning(true);
     setError(null);
@@ -159,7 +171,7 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
         </button>
         <button
           className="btn"
-          onClick={() => root && runScan(root)}
+          onClick={() => root && void runScan(root)}
           disabled={!root || scanning}
         >
           {scanning ? "Scanning…" : "Re-scan"}
@@ -249,22 +261,12 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
             </header>
             <ul className="cleanable-list">
               {p.cleanable.map((c) => (
-                <li key={c.path}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(c.path)}
-                      onChange={() => toggle(c.path)}
-                    />
-                    <span className="cleanable-label">{c.label}</span>
-                    <span className="cleanable-path" title={c.path}>
-                      {c.path}
-                    </span>
-                    <span className="cleanable-size">
-                      {formatBytes(c.size_bytes)}
-                    </span>
-                  </label>
-                </li>
+                <CleanableRow
+                  key={c.path}
+                  cleanable={c}
+                  checked={selected.has(c.path)}
+                  onToggle={toggle}
+                />
               ))}
             </ul>
           </article>

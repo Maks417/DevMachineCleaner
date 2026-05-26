@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cleanPaths, scanAiCaches, type AiCacheEntry } from "../lib/ipc";
 import { formatBytes } from "../lib/format";
+import { CacheRow } from "./CacheRow";
 
 export function AiCachesPanel() {
   const [entries, setEntries] = useState<AiCacheEntry[]>([]);
@@ -10,6 +11,9 @@ export function AiCachesPanel() {
   const [success, setSuccess] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string | null>(null);
+  // Monotonically increasing refresh id used to drop stale results when the
+  // user triggers a re-scan while one is already in flight.
+  const refreshIdRef = useRef(0);
 
   // Aggregate found caches by id with totals — drives the filter chips.
   const cacheStats = useMemo(() => {
@@ -34,43 +38,55 @@ export function AiCachesPanel() {
     [existing, filter],
   );
 
-  const totalSelectedBytes = useMemo(
-    () =>
-      visible
-        .filter((e) => selected.has(e.path))
-        .reduce((acc, e) => acc + e.size_bytes, 0),
-    [visible, selected],
+  const sizeByPath = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of entries) map.set(e.path, e.size_bytes);
+    return map;
+  }, [entries]);
+
+  const totalSelectedBytes = useMemo(() => {
+    let total = 0;
+    for (const path of selected) total += sizeByPath.get(path) ?? 0;
+    return total;
+  }, [selected, sizeByPath]);
+
+  const totalVisibleBytes = useMemo(
+    () => visible.reduce((acc, e) => acc + e.size_bytes, 0),
+    [visible],
   );
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
+    const myId = ++refreshIdRef.current;
     setLoading(true);
     setError(null);
     setSuccess(null);
     try {
       const result = await scanAiCaches();
+      if (refreshIdRef.current !== myId) return;
       result.sort((a, b) => Number(b.exists) - Number(a.exists) || b.size_bytes - a.size_bytes);
       setEntries(result);
       setSelected(new Set());
       setFilter(null);
     } catch (e) {
+      if (refreshIdRef.current !== myId) return;
       setError(String(e));
     } finally {
-      setLoading(false);
+      if (refreshIdRef.current === myId) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    refresh();
   }, []);
 
-  const toggle = (path: string) => {
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const toggle = useCallback((path: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
       else next.add(path);
       return next;
     });
-  };
+  }, []);
 
   const selectAll = () => setSelected(new Set(visible.map((e) => e.path)));
   const selectNone = () => setSelected(new Set());
@@ -82,9 +98,6 @@ export function AiCachesPanel() {
       `Move ${paths.length} AI cache location(s) to the Recycle Bin / Trash?`,
     );
     if (!ok) return;
-
-    const sizeByPath = new Map<string, number>();
-    for (const e of entries) sizeByPath.set(e.path, e.size_bytes);
 
     setCleaning(true);
     setError(null);
@@ -110,12 +123,10 @@ export function AiCachesPanel() {
     }
   };
 
-  const totalVisibleBytes = visible.reduce((a, e) => a + e.size_bytes, 0);
-
   return (
     <section className="panel">
       <div className="panel-bar">
-        <button className="btn primary" onClick={refresh} disabled={loading}>
+        <button className="btn primary" onClick={() => void refresh()} disabled={loading}>
           Re-scan
         </button>
         <span className="folder-path">
@@ -190,24 +201,12 @@ export function AiCachesPanel() {
 
       <ul className="cache-list">
         {visible.map((e) => (
-          <li key={e.path} className="cache-row">
-            <label>
-              <input
-                type="checkbox"
-                checked={selected.has(e.path)}
-                onChange={() => toggle(e.path)}
-              />
-              <div className="cache-text">
-                <div className="cache-name">
-                  {e.name} <span className="cache-size">{formatBytes(e.size_bytes)}</span>
-                </div>
-                <div className="cache-note">{e.note}</div>
-                <div className="cache-path" title={e.path}>
-                  {e.path}
-                </div>
-              </div>
-            </label>
-          </li>
+          <CacheRow
+            key={e.path}
+            entry={e}
+            checked={selected.has(e.path)}
+            onToggle={toggle}
+          />
         ))}
       </ul>
 

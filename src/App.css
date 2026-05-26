@@ -172,11 +172,30 @@ body::after {
 }
 
 .app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 10px 22px;
   font-size: 12px;
   color: var(--text-faint);
   border-top: 1px solid var(--hairline);
   background: var(--glass-1);
+}
+
+.app-footer-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-version {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  flex-shrink: 0;
 }
 
 /* ---------- panels ---------- */
@@ -295,8 +314,7 @@ body::after {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  transition: all 180ms ease;
-  backdrop-filter: blur(8px);
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
 .filter-chip:hover {
@@ -392,8 +410,7 @@ body::after {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   padding: 16px 18px;
-  backdrop-filter: blur(14px);
-  transition: border-color 200ms ease, transform 200ms ease;
+  transition: border-color 200ms ease;
 }
 
 .project-card:hover {
@@ -493,7 +510,7 @@ input[type="checkbox"] {
   cursor: pointer;
   flex-shrink: 0;
   position: relative;
-  transition: all 160ms ease;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 input[type="checkbox"]:hover {
@@ -545,7 +562,6 @@ input[type="checkbox"]:checked::after {
   background: linear-gradient(180deg, var(--glass-2), var(--glass-1));
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
-  backdrop-filter: blur(12px);
   transition: border-color 200ms ease;
 }
 
