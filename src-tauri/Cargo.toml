@@ -5,8 +5,8 @@ description = "Reclaim disk space by cleaning dev build artifacts and AI caches"
 authors = ["Max Davydov"]
 edition = "2021"
 license = "MIT"
-homepage = "https://github.com/Maks417/dev-cleanup"
-repository = "https://github.com/Maks417/dev-cleanup"
+homepage = "https://github.com/Maks417/DevMachineCleaner"
+repository = "https://github.com/Maks417/DevMachineCleaner"
 
 [lib]
 name = "dev_cleanup_lib"
