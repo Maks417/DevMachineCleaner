@@ -38,11 +38,15 @@ export default function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <nav className="tabs">
+      <aside className="sidebar" aria-label="Primary">
+        <div className="sidebar-brand">Dev Cleanup</div>
+        <nav className="tabs" role="tablist" aria-label="Cleanup category">
           {TABS.map((t) => (
             <button
               key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              aria-current={tab === t.id ? "page" : undefined}
               className={tab === t.id ? "tab active" : "tab"}
               onClick={() => setTab(t.id)}
             >
@@ -53,7 +57,7 @@ export default function App() {
       </aside>
 
       <div className="content">
-        <main className="app-main">
+        <main className="app-main" role="main">
           {tab === "projects" ? (
             <ProjectsPanel root={root} onPickFolder={pickFolder} />
           ) : (

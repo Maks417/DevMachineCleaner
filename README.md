@@ -37,19 +37,39 @@ click.
   - .NET (`*.csproj` / `*.fsproj` / `*.vbproj` / `*.sln`) → `bin`, `obj`
   - Flutter/Dart (`pubspec.yaml`) → `build`, `.dart_tool`
   - Xcode (`*.xcodeproj` / `*.xcworkspace`) → `build`, `DerivedData`
+  - PHP / Composer (`composer.json`) → `vendor`
+  - Ruby / Bundler (`Gemfile`) → `.bundle`, `vendor/bundle`
+  - Swift / SPM (`Package.swift`) → `.build`
+  - Terraform (`*.tf`) → `.terraform`
+  - CMake (`CMakeLists.txt`) → `build`, `cmake-build-*`
+  - Bun (`bun.lockb`, `bunfig.toml`) → `node_modules`
+  - Deno (`deno.json`, `deno.jsonc`)
 - **AI cache scanning** — looks up known cache locations for:
-  - HuggingFace, Ollama, PyTorch, TensorFlow
+  - HuggingFace, Ollama, PyTorch, TensorFlow / Keras
   - LM Studio, Jan, GPT4All
-  - Cursor IDE (volatile caches only — extensions stay)
+  - Diffusers, OpenAI Triton kernel cache, NVIDIA compute cache
+  - Cursor, VS Code, Windsurf (volatile Electron caches only — extensions stay)
   - Claude Desktop, Claude Code (conversation history is never touched)
-- **Filter chips** — slice results by stack or cache type before cleaning
-- **Safe by default** — every delete request is checked against a
-  backend-maintained allowlist of paths produced by the most recent scan, then
-  moved to the OS trash via the
-  [`trash`](https://crates.io/crates/trash) crate; you can restore them from
-  the bin/trash any time
+- **Category tags** on every item — `dependencies` / `build output` / `cache`
+  / `model weights` / `logs` — so you know what redownloads vs what
+  regenerates locally.
+- **Filter, search, and sort** — slice results by stack or cache type, search
+  by name or path, and sort by size or name before cleaning.
+- **In-app confirmation dialog** — shows total bytes, per-item paths and
+  sizes, category breakdown, and a recoverability reminder before any delete.
+- **Post-clean report** — expandable success/failure list per path, so you
+  can verify exactly what happened.
+- **Cancellable scans with live progress** — a Cancel button is available
+  while a scan is running; you'll see scanned-entry counters and elapsed
+  time.
+- **Scan-session safe deletion** — every scan returns a session id; the
+  cleaner accepts only paths from that specific session, then moves items to
+  the OS trash via the [`trash`](https://crates.io/crates/trash) crate. Stale
+  paths from older sessions are rejected. Symlinks and Windows junctions are
+  also refused so deletion never affects a link's target.
 - **Liquid-glass UI** — translucent layered surfaces, backdrop blur, pill
-  buttons, custom checkboxes; dark mode only (for now)
+  buttons, custom checkboxes; responsive on narrow windows; dark mode only
+  (for now).
 
 ## Download
 
@@ -85,6 +105,16 @@ npm run tauri dev      # run in dev mode
 npm run tauri build    # produce a release bundle for your OS
 ```
 
+### Tests + quality gates
+
+```bash
+npm run typecheck      # tsc --noEmit
+npm test               # vitest run (frontend)
+( cd src-tauri && cargo fmt --all -- --check && cargo clippy --all-targets -- -D warnings && cargo test --lib )
+```
+
+The CI workflow runs the same set on every PR.
+
 ## Tech stack
 
 - **Shell:** [Tauri 2](https://tauri.app/) — Rust backend, system WebView frontend
@@ -96,13 +126,19 @@ npm run tauri build    # produce a release bundle for your OS
 
 - Nothing is ever permanently deleted by the app — everything goes through the
   OS Recycle Bin / Trash.
-- The Tauri command that performs the delete (`clean_paths`) only accepts
-  paths that the backend itself produced during a recent scan. Even if the
-  WebView is compromised, it cannot request deletion of arbitrary user data.
+- Every scan produces a session id. The Tauri command that performs the
+  delete (`clean_paths`) requires the matching session id, and only accepts
+  paths the backend itself advertised during that specific scan. Stale paths
+  from earlier scans (or any path the WebView synthesises) are rejected.
+- Symlinks and Windows junctions are rejected by the cleaner so deleting a
+  link never affects the target it points at.
 - AI cache paths are conservative: only volatile cache directories are
   targeted, never configuration, extensions, or conversation history.
-- Before cleaning, you'll always see a confirmation dialog with the list of
-  paths and a total size.
+- Before cleaning, you always see an in-app confirmation dialog with the
+  list of paths, a category breakdown, and the total size.
+
+See [`SECURITY.md`](SECURITY.md) for the full threat model and how to report
+vulnerabilities, and [`CHANGELOG.md`](CHANGELOG.md) for a list of changes.
 
 ## Cutting a release (maintainer)
 

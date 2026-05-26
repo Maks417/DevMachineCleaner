@@ -112,6 +112,7 @@ jobs:
         run: npm ci
 
       - name: Build + bundle + attach to release
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -125,6 +126,40 @@ jobs:
             macOS runner in 2026, so we no longer ship a prebuilt Intel `.dmg`.
 
             Items are moved to the OS Recycle Bin / Trash and remain recoverable.
+
+            See [CHANGELOG.md](https://github.com/Maks417/dev-cleanup/blob/main/CHANGELOG.md)
+            for the list of changes in this release.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.platform.args }}
+
+      # Generate SHA-256 sums for the bundles produced by tauri-action and
+      # upload them as a separate asset on the draft release. Users can verify
+      # downloads with `shasum -a 256 -c <file>` or PowerShell's Get-FileHash.
+      - name: Compute checksums
+        if: steps.tauri.outputs.artifactPaths != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          paths='${{ steps.tauri.outputs.artifactPaths }}'
+          mkdir -p _checksums
+          out="_checksums/SHA256SUMS-${{ matrix.platform.name }}.txt"
+          : > "$out"
+          # tauri-action emits a JSON array of absolute paths.
+          node -e "const p = JSON.parse(process.argv[1]); p.forEach(x => console.log(x));" "$paths" | while IFS= read -r f; do
+            if [ -f "$f" ]; then
+              name=$(basename "$f")
+              sha=$(node -e "const c=require('crypto');const fs=require('fs');const h=c.createHash('sha256');h.update(fs.readFileSync(process.argv[1]));console.log(h.digest('hex'));" "$f")
+              printf '%s  %s\n' "$sha" "$name" >> "$out"
+            fi
+          done
+          echo "checksum_file=$out" >> "$GITHUB_OUTPUT"
+        id: checksums
+
+      - name: Upload checksums to release
+        if: steps.checksums.outputs.checksum_file != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.verify.outputs.tag }}
+          draft: true
+          files: ${{ steps.checksums.outputs.checksum_file }}

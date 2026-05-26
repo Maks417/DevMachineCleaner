@@ -16,10 +16,19 @@ function CacheRowImpl({ entry, checked, onToggle }: Props) {
           type="checkbox"
           checked={checked}
           onChange={() => onToggle(entry.path)}
+          aria-label={`Select ${entry.name} at ${entry.path}`}
         />
         <div className="cache-text">
           <div className="cache-name">
-            {entry.name}{" "}
+            <span>
+              {entry.name}{" "}
+              <span
+                className={`bucket-tag bucket-${entry.category.replace(/\s+/g, "-")}`}
+                title={entry.note}
+              >
+                {entry.category}
+              </span>
+            </span>
             <span className="cache-size">{formatBytes(entry.size_bytes)}</span>
           </div>
           <div className="cache-note">{entry.note}</div>

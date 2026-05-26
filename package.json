@@ -3,27 +3,48 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "Cross-platform desktop app that reclaims disk space by cleaning developer build artifacts and AI/LLM caches.",
+  "license": "MIT",
+  "author": "Max Davydov",
+  "homepage": "https://github.com/Maks417/dev-cleanup#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Maks417/dev-cleanup.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Maks417/dev-cleanup/issues"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "^2"
+    "@tauri-apps/plugin-dialog": "^2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/ui": "^4.1.7",
+    "jsdom": "^29.1.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
-    "@tauri-apps/cli": "^2"
+    "vitest": "^4.1.7"
   }
 }

@@ -13,6 +13,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::scan_projects,
             commands::scan_ai_caches,
+            commands::cancel_scan,
             commands::clean_paths,
         ])
         .run(tauri::generate_context!())

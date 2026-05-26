@@ -1,10 +1,13 @@
 use std::path::PathBuf;
+use std::sync::Arc;
+
+use serde::Serialize;
 use tauri::async_runtime::spawn_blocking;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::cleaner::{self, CleanResult};
-use crate::scanner::stacks::DetectedProject;
-use crate::scanner::{ai_caches, ai_caches::AiCacheEntry, stacks};
+use crate::scanner::stacks::{self, DetectedProject, ProgressFn, ProjectsScan, ScanProgress};
+use crate::scanner::{ai_caches, ai_caches::AiCacheEntry};
 use crate::state::AppState;
 
 /// Hard ceiling on recursive scan depth. Anything deeper is almost certainly a
@@ -12,12 +15,42 @@ use crate::state::AppState;
 const MAX_SCAN_DEPTH: usize = 12;
 const DEFAULT_SCAN_DEPTH: usize = 6;
 
+/// Wrapped scan response: returns the list of items plus a session id the
+/// frontend echoes back when calling `clean_paths`. Membership in this specific
+/// session authorizes deletion; results from older or other sessions are
+/// rejected.
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectsScanResponse {
+    pub scan_id: u64,
+    pub projects: Vec<DetectedProject>,
+    pub scan_errors: u64,
+    pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AiCachesScanResponse {
+    pub scan_id: u64,
+    pub entries: Vec<AiCacheEntry>,
+    pub scan_errors: u64,
+    pub cancelled: bool,
+}
+
+/// Build a progress callback that emits Tauri events. The handle is cloned into
+/// the closure so it can outlive the borrow on `app`. Failures to emit are
+/// non-fatal — a missed progress event just means a slightly stale UI counter.
+fn progress_emitter(app: AppHandle, event: &'static str) -> ProgressFn {
+    Arc::new(move |p: ScanProgress| {
+        let _ = app.emit(event, p);
+    })
+}
+
 #[tauri::command]
 pub async fn scan_projects(
+    app: AppHandle,
     root: String,
     max_depth: Option<usize>,
     state: State<'_, AppState>,
-) -> Result<Vec<DetectedProject>, String> {
+) -> Result<ProjectsScanResponse, String> {
     let depth = max_depth
         .unwrap_or(DEFAULT_SCAN_DEPTH)
         .clamp(1, MAX_SCAN_DEPTH);
@@ -32,48 +65,94 @@ pub async fn scan_projects(
         return Err(format!("Not a directory: {root}"));
     }
 
-    let projects = spawn_blocking(move || stacks::scan_projects(&path, depth))
+    let cancel = state.begin_scan();
+    let cancel_clone = Arc::clone(&cancel);
+    let progress = progress_emitter(app.clone(), "scan-projects:progress");
+    let _ = app.emit("scan-projects:start", &root);
+
+    let ProjectsScan {
+        projects,
+        scan_errors,
+        cancelled,
+    } = spawn_blocking(move || stacks::scan_projects(&path, depth, cancel_clone, progress))
         .await
         .map_err(|e| e.to_string())?;
 
     // Authorize every cleanable path we just produced. Anything outside this
-    // set will be rejected by `clean_paths`.
+    // session is rejected by `clean_paths`.
     let allow_paths: Vec<PathBuf> = projects
         .iter()
         .flat_map(|p| p.cleanable.iter())
-        .filter_map(|c| std::fs::canonicalize(&c.path).ok())
+        .map(|c| PathBuf::from(&c.path))
         .collect();
-    state.extend_allowlist(allow_paths);
+    let scan_id = state.record_session(allow_paths);
 
-    Ok(projects)
+    let _ = app.emit("scan-projects:done", scan_id);
+
+    Ok(ProjectsScanResponse {
+        scan_id,
+        projects,
+        scan_errors,
+        cancelled,
+    })
 }
 
 #[tauri::command]
 pub async fn scan_ai_caches(
+    app: AppHandle,
     state: State<'_, AppState>,
-) -> Result<Vec<AiCacheEntry>, String> {
-    let entries = spawn_blocking(ai_caches::list_ai_caches)
+) -> Result<AiCachesScanResponse, String> {
+    let cancel = state.begin_scan();
+    let cancel_clone = Arc::clone(&cancel);
+    let progress = progress_emitter(app.clone(), "scan-ai:progress");
+    let _ = app.emit("scan-ai:start", ());
+
+    let scan = spawn_blocking(move || ai_caches::list_ai_caches(cancel_clone, progress))
         .await
         .map_err(|e| e.to_string())?;
 
-    let allow_paths: Vec<PathBuf> = entries
+    let allow_paths: Vec<PathBuf> = scan
+        .entries
         .iter()
         .filter(|e| e.exists)
-        .filter_map(|e| std::fs::canonicalize(&e.path).ok())
+        .map(|e| PathBuf::from(&e.path))
         .collect();
-    state.extend_allowlist(allow_paths);
+    let scan_id = state.record_session(allow_paths);
 
-    Ok(entries)
+    let _ = app.emit("scan-ai:done", scan_id);
+
+    Ok(AiCachesScanResponse {
+        scan_id,
+        entries: scan.entries,
+        scan_errors: scan.scan_errors,
+        cancelled: scan.cancelled,
+    })
+}
+
+/// Cancel the most recent in-flight scan, if any. The scan returns shortly
+/// after with `cancelled: true` and a partial result set.
+#[tauri::command]
+pub async fn cancel_scan(state: State<'_, AppState>) -> Result<(), String> {
+    state.cancel_active_scan();
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn clean_paths(
+    scan_id: u64,
     paths: Vec<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<CleanResult>, String> {
-    // Snapshot the allowlist into the blocking task so we don't hold the
-    // Mutex across an await point.
-    let allow = state.snapshot();
+    // Resolve and snapshot the session into the blocking task; if the session
+    // was evicted (or never existed), reject the whole batch up front.
+    let allow = match state.session_paths(scan_id) {
+        Some(set) => set,
+        None => {
+            return Err(format!(
+                "Unknown or expired scan session ({scan_id}); please re-scan and try again",
+            ));
+        }
+    };
     spawn_blocking(move || cleaner::clean_paths(paths, &allow))
         .await
         .map_err(|e| e.to_string())

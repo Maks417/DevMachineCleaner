@@ -16,8 +16,15 @@ function CleanableRowImpl({ cleanable, checked, onToggle }: Props) {
           type="checkbox"
           checked={checked}
           onChange={() => onToggle(cleanable.path)}
+          aria-label={`Select ${cleanable.label} at ${cleanable.path}`}
         />
         <span className="cleanable-label">{cleanable.label}</span>
+        <span
+          className={`bucket-tag bucket-${cleanable.category.replace(/\s+/g, "-")}`}
+          title={cleanable.note}
+        >
+          {cleanable.category}
+        </span>
         <span className="cleanable-path" title={cleanable.path}>
           {cleanable.path}
         </span>
