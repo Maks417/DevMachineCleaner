@@ -1,7 +1,7 @@
 # Developer Machine Cleaner
 
-[![CI](https://github.com/Maks417/dev-cleanup/actions/workflows/ci.yml/badge.svg)](https://github.com/Maks417/dev-cleanup/actions/workflows/ci.yml)
-[![Release](https://github.com/Maks417/dev-cleanup/actions/workflows/release.yml/badge.svg)](https://github.com/Maks417/dev-cleanup/actions/workflows/release.yml)
+[![CI](https://github.com/Maks417/DevMachineCleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/Maks417/DevMachineCleaner/actions/workflows/ci.yml)
+[![Release](https://github.com/Maks417/DevMachineCleaner/actions/workflows/release.yml/badge.svg)](https://github.com/Maks417/DevMachineCleaner/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#download)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app/)
@@ -73,7 +73,7 @@ click.
 
 ## Download
 
-Bundles are published on the [Releases page](https://github.com/Maks417/dev-cleanup/releases).
+Bundles are published on the [Releases page](https://github.com/Maks417/DevMachineCleaner/releases).
 Pick the one for your platform:
 
 | Platform | Artifact |
@@ -98,8 +98,8 @@ Prerequisites:
 - OS-specific deps for Tauri 2 — see the [Tauri prerequisites page](https://tauri.app/start/prerequisites/)
 
 ```bash
-git clone https://github.com/Maks417/dev-cleanup.git
-cd dev-cleanup
+git clone https://github.com/Maks417/DevMachineCleaner.git
+cd DevMachineCleaner
 npm install
 npm run tauri dev      # run in dev mode
 npm run tauri build    # produce a release bundle for your OS

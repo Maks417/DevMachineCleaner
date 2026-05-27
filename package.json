@@ -6,13 +6,13 @@
   "description": "Cross-platform desktop app that reclaims disk space by cleaning developer build artifacts and AI/LLM caches.",
   "license": "MIT",
   "author": "Max Davydov",
-  "homepage": "https://github.com/Maks417/dev-cleanup#readme",
+  "homepage": "https://github.com/Maks417/DevMachineCleaner#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Maks417/dev-cleanup.git"
+    "url": "https://github.com/Maks417/DevMachineCleaner.git"
   },
   "bugs": {
-    "url": "https://github.com/Maks417/dev-cleanup/issues"
+    "url": "https://github.com/Maks417/DevMachineCleaner/issues"
   },
   "scripts": {
     "dev": "vite",

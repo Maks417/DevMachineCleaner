@@ -181,7 +181,7 @@ pub fn scan_projects(
     let mut cancelled = false;
     for entry_result in walker {
         visited = visited.saturating_add(1);
-        if visited % PROGRESS_STRIDE == 0 {
+        if visited.is_multiple_of(PROGRESS_STRIDE) {
             if cancel.load(Ordering::Relaxed) {
                 cancelled = true;
                 break;
@@ -485,9 +485,16 @@ mod tests {
                 stack.name,
             );
             for c in &stack.cleanable {
-                assert!(!c.name.is_empty(), "cleanable in {} has empty name", stack.name);
                 assert!(
-                    matches!(c.category.as_str(), "dependencies" | "build output" | "cache"),
+                    !c.name.is_empty(),
+                    "cleanable in {} has empty name",
+                    stack.name
+                );
+                assert!(
+                    matches!(
+                        c.category.as_str(),
+                        "dependencies" | "build output" | "cache"
+                    ),
                     "stack {} cleanable {} has unknown category {}",
                     stack.name,
                     c.name,

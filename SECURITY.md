@@ -51,7 +51,7 @@ If you discover a vulnerability, please report it privately rather than
 opening a public issue:
 
 1. Use GitHub's
-   [private vulnerability reporting](https://github.com/Maks417/dev-cleanup/security/advisories/new)
+   [private vulnerability reporting](https://github.com/Maks417/DevMachineCleaner/security/advisories/new)
    on this repository, or
 2. Email the maintainer through the contact listed on their GitHub profile.
 

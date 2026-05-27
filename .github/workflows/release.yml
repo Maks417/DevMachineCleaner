@@ -33,7 +33,7 @@ jobs:
         run: echo "tag=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout requested tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ steps.resolve.outputs.tag }}
 
@@ -73,7 +73,7 @@ jobs:
 
     steps:
       - name: Checkout requested tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.verify.outputs.tag }}
 
@@ -95,7 +95,7 @@ jobs:
             file
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -127,7 +127,7 @@ jobs:
 
             Items are moved to the OS Recycle Bin / Trash and remain recoverable.
 
-            See [CHANGELOG.md](https://github.com/Maks417/dev-cleanup/blob/main/CHANGELOG.md)
+            See [CHANGELOG.md](https://github.com/Maks417/DevMachineCleaner/blob/master/CHANGELOG.md)
             for the list of changes in this release.
           releaseDraft: true
           prerelease: false
@@ -158,7 +158,7 @@ jobs:
 
       - name: Upload checksums to release
         if: steps.checksums.outputs.checksum_file != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.verify.outputs.tag }}
           draft: true

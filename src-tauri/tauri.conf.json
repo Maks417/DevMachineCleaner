@@ -31,7 +31,7 @@
     "longDescription": "Cross-platform desktop app that detects developer project artifacts (node_modules, target, .venv, build, ...) and known AI/LLM caches and moves the selected ones to the OS Recycle Bin / Trash so they can be recovered.",
     "copyright": "Copyright (c) 2026 Max Davydov",
     "publisher": "Max Davydov",
-    "homepage": "https://github.com/Maks417/dev-cleanup",
+    "homepage": "https://github.com/Maks417/DevMachineCleaner",
     "license": "MIT",
     "icon": [
       "icons/32x32.png",
