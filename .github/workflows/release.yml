@@ -33,7 +33,7 @@ jobs:
         run: echo "tag=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout requested tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ steps.resolve.outputs.tag }}
 
@@ -73,7 +73,7 @@ jobs:
 
     steps:
       - name: Checkout requested tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.verify.outputs.tag }}
 
