@@ -158,7 +158,7 @@ jobs:
 
       - name: Upload checksums to release
         if: steps.checksums.outputs.checksum_file != ''
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.verify.outputs.tag }}
           draft: true
