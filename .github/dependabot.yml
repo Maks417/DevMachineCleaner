@@ -21,6 +21,10 @@ updates:
           - "@vitest/*"
           - "@testing-library/*"
           - "jsdom"
+      vite:
+        patterns:
+          - "vite"
+          - "@vitejs/plugin-react"
 
   - package-ecosystem: cargo
     directory: "/src-tauri"
