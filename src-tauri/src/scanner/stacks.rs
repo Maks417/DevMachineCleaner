@@ -225,7 +225,7 @@ fn group_nested_projects(
                 }
             }
 
-            cleanable.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+            cleanable.sort_by_key(|c| std::cmp::Reverse(c.size_bytes));
             let total_cleanable_bytes: u64 = cleanable.iter().map(|c| c.size_bytes).sum();
             let name = root_path
                 .file_name()
