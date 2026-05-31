@@ -43,7 +43,7 @@ click.
   - Terraform (`*.tf`) → `.terraform`
   - CMake (`CMakeLists.txt`) → `build`, `cmake-build-*`
   - Bun (`bun.lockb`, `bunfig.toml`) → `node_modules`
-  - Deno (`deno.json`, `deno.jsonc`)
+  - Deno (`deno.json`, `deno.jsonc`) → `node_modules`, `vendor`
 - **AI cache scanning** — looks up known cache locations for:
   - HuggingFace, Ollama, PyTorch, TensorFlow / Keras
   - LM Studio, Jan, GPT4All

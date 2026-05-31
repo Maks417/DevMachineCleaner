@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use walkdir::WalkDir;
 
-use super::{dir_size, SizeStats};
+use super::{SizeCache, SizeStats};
 
 /// Progress event payload emitted while a scan is in flight. The frontend
 /// listens to `scan-projects:progress` / `scan-ai:progress` to surface
@@ -258,6 +258,7 @@ pub fn scan_projects(
     max_depth: usize,
     cancel: Arc<AtomicBool>,
     progress: ProgressFn,
+    size_cache: &SizeCache,
 ) -> ProjectsScan {
     let discovery_errors = AtomicU64::new(0);
     let mut hits: Vec<(PathBuf, Vec<&'static StackRule>)> = Vec::new();
@@ -315,8 +316,8 @@ pub fn scan_projects(
     }
 
     // Flatten to one granular parallel layer keyed by cleanable directory.
-    // Each unit of work is one `dir_size` walk; rayon's work-stealing
-    // scheduler decides how to spread them across the thread pool.
+    // Each unit of work is one cached size measurement (a `dir_size` walk on a
+    // cache miss); rayon's work-stealing scheduler spreads them across the pool.
     let units: Vec<(usize, &'static Cleanable)> = hits
         .iter()
         .enumerate()
@@ -368,7 +369,7 @@ pub fn scan_projects(
                 });
                 return None;
             }
-            let stats = dir_size(&p);
+            let stats = size_cache.measure(&p);
             let done = sized_counter.fetch_add(1, Ordering::Relaxed) + 1;
             progress(ScanProgress {
                 phase: "sizing",
@@ -429,7 +430,13 @@ mod tests {
     }
 
     fn run_scan(root: &Path, depth: usize) -> ProjectsScan {
-        scan_projects(root, depth, never_cancel(), no_progress())
+        scan_projects(
+            root,
+            depth,
+            never_cancel(),
+            no_progress(),
+            &SizeCache::default(),
+        )
     }
 
     #[test]
@@ -687,7 +694,7 @@ mod tests {
         touch(&proj.join("Cargo.toml"));
         mkdir(&proj.join("target"));
         let cancel = Arc::new(AtomicBool::new(true));
-        let scan = scan_projects(tmp.path(), 4, cancel, no_progress());
+        let scan = scan_projects(tmp.path(), 4, cancel, no_progress(), &SizeCache::default());
         assert!(scan.cancelled, "expected scan to be marked cancelled");
     }
 
@@ -705,7 +712,13 @@ mod tests {
         let progress: ProgressFn = Arc::new(move |p| {
             phases_clone.lock().unwrap().push(p.phase);
         });
-        let _ = scan_projects(tmp.path(), 4, never_cancel(), progress);
+        let _ = scan_projects(
+            tmp.path(),
+            4,
+            never_cancel(),
+            progress,
+            &SizeCache::default(),
+        );
         let phases = phases.lock().unwrap();
         assert!(phases.contains(&"discovery"));
         assert!(phases.contains(&"sizing"));

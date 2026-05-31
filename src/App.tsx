@@ -58,11 +58,14 @@ export default function App() {
 
       <div className="content">
         <main className="app-main" role="main">
-          {tab === "projects" ? (
+          {/* Both panels stay mounted so switching tabs never aborts an
+              in-flight scan or discards results; the inactive one is hidden. */}
+          <div hidden={tab !== "projects"}>
             <ProjectsPanel root={root} onPickFolder={pickFolder} />
-          ) : (
-            <AiCachesPanel />
-          )}
+          </div>
+          <div hidden={tab !== "ai"}>
+            <AiCachesPanel active={tab === "ai"} />
+          </div>
         </main>
 
         <footer className="app-footer">

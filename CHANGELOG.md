@@ -7,6 +7,36 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- **Scan depth control.** The Projects panel exposes a depth selector (4–12) so
+  you can scan shallower for speed or deeper to reach nested projects.
+- **Deno cleanables.** Deno projects now report `node_modules` and `vendor` as
+  reclaimable.
+- **Incremental sizing.** A process-lifetime size cache keyed on directory mtime
+  lets repeat project scans skip re-walking unchanged trees (e.g. large
+  `node_modules`).
+
+### Changed
+
+- **Tabs keep their state.** Both panels stay mounted when switching tabs, so an
+  in-flight scan or its results are never discarded. The AI caches panel scans
+  lazily the first time it is opened.
+- **Project search** now also matches cleanable folder labels (e.g.
+  `apps/web/node_modules`).
+- **Stack filter chips** no longer imply additive per-stack byte totals; the
+  tooltip clarifies that a polyglot project's bytes count toward each of its
+  stacks.
+- **Partial-clean feedback.** When some items succeed and others fail, the panel
+  shows a success banner alongside a warning instead of only an error.
+- **Confirm dialog accessibility.** The dialog focuses Cancel first, traps focus
+  while open, and locks background scroll.
+
+### Internal
+
+- Shared `useCleanPanel` hook centralizes the scan/select/clean state machine
+  used by both panels.
+
 ## [0.3.0] - 2026-05-31
 
 ### Added

@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  cancelScan,
-  cleanPaths,
-  onScanProgress,
-  scanAiCaches,
-  type AiCacheEntry,
-  type CleanResult,
-  type ScanProgress,
-} from "../lib/ipc";
+import { scanAiCaches, type AiCacheEntry } from "../lib/ipc";
+import { useCleanPanel, type NormalizedScan } from "../lib/useCleanPanel";
 import { formatBytes } from "../lib/format";
 import { CacheRow } from "./CacheRow";
 import { ConfirmCleanDialog, type CleanItem } from "./ConfirmCleanDialog";
@@ -22,36 +15,76 @@ const SORT_OPTIONS = [
 
 type SortMode = "size_desc" | "size_asc" | "name_asc";
 
-interface ScanState {
-  scanId: number | null;
-  entries: AiCacheEntry[];
-  scanErrors: number;
+interface Props {
+  /** True when the AI caches tab is visible. Drives the lazy initial scan. */
+  active: boolean;
 }
 
-const INITIAL_SCAN: ScanState = { scanId: null, entries: [], scanErrors: 0 };
+const sizeByPathFn = (entries: AiCacheEntry[]) => {
+  const map = new Map<string, number>();
+  for (const e of entries) map.set(e.path, e.size_bytes);
+  return map;
+};
 
-export function AiCachesPanel() {
-  const [scan, setScan] = useState<ScanState>(INITIAL_SCAN);
-  const [loading, setLoading] = useState(false);
-  const [scanElapsedMs, setScanElapsedMs] = useState(0);
-  const [progress, setProgress] = useState<ScanProgress | null>(null);
-  const [cleaning, setCleaning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [results, setResults] = useState<CleanResult[] | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+export function AiCachesPanel({ active }: Props) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortMode>("size_desc");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string | null>(null);
-  // Monotonically increasing refresh id used to drop stale results when the
-  // user triggers a re-scan while one is already in flight.
-  const refreshIdRef = useRef(0);
+  // Guards the one-time auto-scan so it runs only the first time the tab is
+  // shown, not on app mount (the panel is always mounted).
+  const hasScannedRef = useRef(false);
+
+  const onScanStart = useCallback(() => setFilter(null), []);
+
+  const {
+    items: entries,
+    scanId,
+    scanErrors,
+    scanning: loading,
+    scanElapsedMs,
+    progress,
+    cleaning,
+    error,
+    warning,
+    success,
+    results,
+    confirmOpen,
+    selected,
+    sizeByPath,
+    totalSelectedBytes,
+    runScan,
+    cancel,
+    toggle,
+    setSelected,
+    selectNone,
+    setConfirmOpen,
+    setResults,
+    performClean,
+  } = useCleanPanel<AiCacheEntry>({
+    kind: "ai",
+    sizeByPath: sizeByPathFn,
+    cleanedNoun: "cache",
+    onScanStart,
+  });
+
+  // Existing entries first, then by size descending.
+  const doScan = useCallback(async (): Promise<NormalizedScan<AiCacheEntry>> => {
+    const result = await scanAiCaches();
+    const items = [...result.entries].sort(
+      (a, b) => Number(b.exists) - Number(a.exists) || b.size_bytes - a.size_bytes,
+    );
+    return {
+      scanId: result.scan_id,
+      items,
+      scanErrors: result.scan_errors,
+      cancelled: result.cancelled,
+    };
+  }, []);
 
   // Aggregate found caches by id with totals — drives the filter chips.
   const cacheStats = useMemo(() => {
     const map = new Map<string, { name: string; count: number; bytes: number }>();
-    for (const e of scan.entries) {
+    for (const e of entries) {
       if (!e.exists) continue;
       const v = map.get(e.id) ?? { name: e.name, count: 0, bytes: 0 };
       v.count += 1;
@@ -61,10 +94,10 @@ export function AiCachesPanel() {
     return Array.from(map.entries())
       .map(([id, v]) => ({ id, ...v }))
       .sort((a, b) => b.bytes - a.bytes);
-  }, [scan.entries]);
+  }, [entries]);
 
-  const existing = useMemo(() => scan.entries.filter((e) => e.exists), [scan.entries]);
-  const missing = useMemo(() => scan.entries.filter((e) => !e.exists), [scan.entries]);
+  const existing = useMemo(() => entries.filter((e) => e.exists), [entries]);
+  const missing = useMemo(() => entries.filter((e) => !e.exists), [entries]);
 
   const visible = useMemo(() => {
     const lowered = search.trim().toLowerCase();
@@ -85,102 +118,24 @@ export function AiCachesPanel() {
     return list;
   }, [existing, filter, search, sort]);
 
-  const sizeByPath = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of scan.entries) map.set(e.path, e.size_bytes);
-    return map;
-  }, [scan.entries]);
-
-  const totalSelectedBytes = useMemo(() => {
-    let total = 0;
-    for (const path of selected) total += sizeByPath.get(path) ?? 0;
-    return total;
-  }, [selected, sizeByPath]);
-
   const totalVisibleBytes = useMemo(
     () => visible.reduce((acc, e) => acc + e.size_bytes, 0),
     [visible],
   );
 
-  const refresh = useCallback(async () => {
-    const myId = ++refreshIdRef.current;
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    setResults(null);
-    setProgress(null);
-    const startedAt = performance.now();
-    setScanElapsedMs(0);
-    try {
-      const result = await scanAiCaches();
-      if (refreshIdRef.current !== myId) return;
-      result.entries.sort(
-        (a, b) => Number(b.exists) - Number(a.exists) || b.size_bytes - a.size_bytes,
-      );
-      setScan({
-        scanId: result.scan_id,
-        entries: result.entries,
-        scanErrors: result.scan_errors,
-      });
-      setSelected(new Set());
-      setFilter(null);
-      setScanElapsedMs(Math.round(performance.now() - startedAt));
-      if (result.cancelled) {
-        setError("Scan was cancelled; showing partial results.");
-      }
-    } catch (e) {
-      if (refreshIdRef.current !== myId) return;
-      setError(String(e));
-    } finally {
-      if (refreshIdRef.current === myId) {
-        setLoading(false);
-        setProgress(null);
-      }
-    }
-  }, []);
-
+  // Lazy initial scan: scan the first time this tab becomes active.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void onScanProgress("ai", (p) => {
-      if (!cancelled) setProgress(p);
-    }).then((u) => {
-      if (cancelled) u();
-      else unlisten = u;
-    });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, []);
-
-  const handleCancel = async () => {
-    try {
-      await cancelScan();
-    } catch {
-      // best-effort
+    if (active && !hasScannedRef.current) {
+      hasScannedRef.current = true;
+      void runScan(doScan);
     }
-  };
-
-  const toggle = useCallback((path: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  }, []);
+  }, [active, runScan, doScan]);
 
   const selectAll = () => setSelected(new Set(visible.map((e) => e.path)));
-  const selectNone = () => setSelected(new Set());
 
   const confirmItems = useMemo<CleanItem[]>(() => {
     const items: CleanItem[] = [];
-    for (const e of scan.entries) {
+    for (const e of entries) {
       if (!selected.has(e.path)) continue;
       items.push({
         path: e.path,
@@ -193,63 +148,21 @@ export function AiCachesPanel() {
     }
     items.sort((a, b) => b.size_bytes - a.size_bytes);
     return items;
-  }, [scan.entries, selected]);
-
-  const performClean = async () => {
-    if (selected.size === 0) return;
-    if (scan.scanId == null) {
-      setError("Scan results are stale; please re-scan before cleaning.");
-      return;
-    }
-    setConfirmOpen(false);
-    setCleaning(true);
-    setError(null);
-    setSuccess(null);
-    setResults(null);
-    const paths = Array.from(selected);
-    try {
-      const results = await cleanPaths(scan.scanId, paths);
-      const failures = results.filter((r) => !r.ok);
-      const succeeded = results.filter((r) => r.ok);
-      const freed = succeeded.reduce((acc, r) => acc + (sizeByPath.get(r.path) ?? 0), 0);
-
-      await refresh();
-
-      setResults(results);
-      if (succeeded.length > 0) {
-        setSuccess(
-          `Freed ${formatBytes(freed)} across ${succeeded.length} cache${succeeded.length === 1 ? "" : "s"}.`,
-        );
-      }
-      if (failures.length > 0 && succeeded.length === 0) {
-        setError(`${failures.length} item(s) failed; expand the report below.`);
-      }
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setCleaning(false);
-    }
-  };
+  }, [entries, selected]);
 
   const filterCleared = (next: string | null) => {
-    if (selected.size > 0 && next !== filter) {
-      setSelected(new Set());
-    }
+    if (selected.size > 0 && next !== filter) selectNone();
     setFilter(next);
   };
 
   return (
     <section className="panel" aria-busy={loading || cleaning}>
       <div className="panel-bar">
-        <button className="btn primary" onClick={() => void refresh()} disabled={loading}>
+        <button className="btn primary" onClick={() => void runScan(doScan)} disabled={loading}>
           {loading ? "Scanning…" : "Re-scan"}
         </button>
         {loading && (
-          <button
-            className="btn small"
-            onClick={() => void handleCancel()}
-            type="button"
-          >
+          <button className="btn small" onClick={() => void cancel()} type="button">
             Cancel
           </button>
         )}
@@ -264,7 +177,7 @@ export function AiCachesPanel() {
             ? `Measuring ${progress.scanned}/${progress.total} known cache locations…`
             : "Looking for AI/LLM caches…"
           : ""}
-        {!loading && scan.scanId != null && !success && !error
+        {!loading && scanId != null && !success && !error
           ? `Scan complete in ${(scanElapsedMs / 1000).toFixed(1)}s.`
           : ""}
       </div>
@@ -279,9 +192,14 @@ export function AiCachesPanel() {
           {error}
         </div>
       )}
-      {scan.scanErrors > 0 && (
+      {warning && (
         <div className="warning" role="status">
-          Some cache folders couldn’t be inspected ({scan.scanErrors} entr{scan.scanErrors === 1 ? "y" : "ies"} skipped). Totals may be conservative.
+          {warning}
+        </div>
+      )}
+      {scanErrors > 0 && (
+        <div className="warning" role="status">
+          Some cache folders couldn’t be inspected ({scanErrors} entr{scanErrors === 1 ? "y" : "ies"} skipped). Totals may be conservative.
         </div>
       )}
 
@@ -415,7 +333,7 @@ export function AiCachesPanel() {
         title="Clean selected AI caches?"
         items={confirmItems}
         totalBytes={totalSelectedBytes}
-        onConfirm={performClean}
+        onConfirm={() => void performClean(doScan)}
         onCancel={() => setConfirmOpen(false)}
       />
     </section>

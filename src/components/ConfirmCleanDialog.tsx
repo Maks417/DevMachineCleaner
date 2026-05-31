@@ -40,15 +40,26 @@ export function ConfirmCleanDialog({
   onConfirm,
   onCancel,
 }: Props) {
-  const confirmRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (open) {
-      // Defer focus until the dialog has mounted; otherwise focus moves before
-      // the element exists and the confirm button is not reachable by Enter.
-      const t = setTimeout(() => confirmRef.current?.focus(), 0);
-      return () => clearTimeout(t);
-    }
+    if (!open) return;
+    // Focus the non-destructive Cancel button first so an accidental Enter
+    // does not immediately trash files. Deferred until the dialog has mounted.
+    const t = setTimeout(() => cancelRef.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, [open]);
+
+  // Lock background scroll while the modal is open so the page behind the
+  // backdrop cannot move under the dialog.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   // Bucket items by category so users see "this much is rebuildable" vs "this
@@ -72,6 +83,23 @@ export function ConfirmCleanDialog({
     if (e.key === "Escape") {
       e.stopPropagation();
       onCancel();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    // Trap focus inside the dialog so Tab/Shift+Tab cycles only its controls.
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusable || focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && active === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
     }
   };
 
@@ -84,7 +112,7 @@ export function ConfirmCleanDialog({
       onClick={onCancel}
       onKeyDown={onKeyDown}
     >
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog" ref={dialogRef} onClick={(e) => e.stopPropagation()}>
         <header className="dialog-head">
           <h2 id="confirm-clean-title">{title}</h2>
           <button
@@ -146,15 +174,10 @@ export function ConfirmCleanDialog({
         </ul>
 
         <footer className="dialog-actions">
-          <button className="btn" onClick={onCancel} type="button">
+          <button ref={cancelRef} className="btn" onClick={onCancel} type="button">
             Cancel
           </button>
-          <button
-            ref={confirmRef}
-            className="btn danger"
-            onClick={onConfirm}
-            type="button"
-          >
+          <button className="btn danger" onClick={onConfirm} type="button">
             Move {items.length} to Trash — {formatBytes(totalBytes)}
           </button>
         </footer>

@@ -1,7 +1,10 @@
 pub mod ai_caches;
 pub mod stacks;
 
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::SystemTime;
 use walkdir::WalkDir;
 
 /// Sum of all file sizes under `path` plus a count of entries that could not
@@ -42,6 +45,63 @@ pub fn dir_size(path: &Path) -> SizeStats {
     stats
 }
 
+/// In-memory cache of directory sizes keyed by path plus the directory's own
+/// modification time. Lets repeat scans skip re-walking large trees (e.g.
+/// `node_modules`) that have not changed between scans. Held in `AppState` so
+/// it persists across scan commands for the life of the process.
+///
+/// Caveat: a directory's mtime only changes when its *direct* entries are added
+/// or removed. Deeply nested writes that do not touch the top-level directory
+/// will not invalidate the cached size, so a cached total can lag reality
+/// between scans. This only affects the displayed estimate — deletion still
+/// removes the whole tree, and every clean is followed by a fresh re-scan.
+#[derive(Default)]
+pub struct SizeCache {
+    inner: Mutex<HashMap<PathBuf, CacheEntry>>,
+}
+
+#[derive(Clone, Copy)]
+struct CacheEntry {
+    mtime: SystemTime,
+    bytes: u64,
+    errors: u64,
+}
+
+impl SizeCache {
+    /// Return the size of `path`, reusing a cached value when the directory's
+    /// mtime is unchanged since it was last measured. Falls back to a full
+    /// [`dir_size`] walk on a miss and records the fresh result.
+    pub fn measure(&self, path: &Path) -> SizeStats {
+        let mtime = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
+        if let Some(mt) = mtime {
+            if let Ok(map) = self.inner.lock() {
+                if let Some(e) = map.get(path) {
+                    if e.mtime == mt {
+                        return SizeStats {
+                            bytes: e.bytes,
+                            errors: e.errors,
+                        };
+                    }
+                }
+            }
+        }
+        let stats = dir_size(path);
+        if let Some(mt) = mtime {
+            if let Ok(mut map) = self.inner.lock() {
+                map.insert(
+                    path.to_path_buf(),
+                    CacheEntry {
+                        mtime: mt,
+                        bytes: stats.bytes,
+                        errors: stats.errors,
+                    },
+                );
+            }
+        }
+        stats
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,5 +125,30 @@ mod tests {
         let stats = dir_size(tmp.path());
         assert_eq!(stats.bytes, 1024 + 512);
         assert_eq!(stats.errors, 0);
+    }
+
+    #[test]
+    fn size_cache_matches_dir_size_and_serves_repeat_calls() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("a.bin"), vec![0u8; 2048]).unwrap();
+        let cache = SizeCache::default();
+        let first = cache.measure(tmp.path());
+        let second = cache.measure(tmp.path());
+        assert_eq!(first.bytes, 2048);
+        assert_eq!(second.bytes, first.bytes);
+        assert_eq!(second.errors, first.errors);
+        // Matches a direct walk.
+        assert_eq!(first.bytes, dir_size(tmp.path()).bytes);
+    }
+
+    #[test]
+    fn size_cache_recomputes_after_direct_change() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("a.bin"), vec![0u8; 1000]).unwrap();
+        let cache = SizeCache::default();
+        assert_eq!(cache.measure(tmp.path()).bytes, 1000);
+        // Adding a direct child changes the dir's mtime, invalidating the cache.
+        fs::write(tmp.path().join("b.bin"), vec![0u8; 500]).unwrap();
+        assert_eq!(cache.measure(tmp.path()).bytes, 1500);
     }
 }

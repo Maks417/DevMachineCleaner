@@ -1,13 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  cancelScan,
-  cleanPaths,
-  onScanProgress,
-  scanProjects,
-  type CleanResult,
-  type DetectedProject,
-  type ScanProgress,
-} from "../lib/ipc";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { scanProjects, type DetectedProject } from "../lib/ipc";
+import { useCleanPanel, type NormalizedScan } from "../lib/useCleanPanel";
 import { formatBytes } from "../lib/format";
 import { CleanableRow } from "./CleanableRow";
 import { ConfirmCleanDialog, type CleanItem } from "./ConfirmCleanDialog";
@@ -20,6 +13,16 @@ const SORT_OPTIONS = [
   { value: "name_asc", label: "Name (A→Z)" },
 ] as const;
 
+const DEPTH_OPTIONS = [
+  { value: "4", label: "Depth 4 (shallow)" },
+  { value: "6", label: "Depth 6 (default)" },
+  { value: "8", label: "Depth 8" },
+  { value: "10", label: "Depth 10" },
+  { value: "12", label: "Depth 12 (deep)" },
+] as const;
+
+const DEFAULT_DEPTH = 6;
+
 interface Props {
   root: string | null;
   onPickFolder: () => void;
@@ -27,36 +30,88 @@ interface Props {
 
 type SortMode = "size_desc" | "size_asc" | "name_asc";
 
-interface ScanState {
-  scanId: number | null;
+// Filter zero-byte cleanables/projects (Rust returns them; the UI hides them)
+// and sort by reclaimable size descending.
+function normalizeProjects(result: {
+  scan_id: number;
   projects: DetectedProject[];
-  scanErrors: number;
+  scan_errors: number;
+  cancelled: boolean;
+}): NormalizedScan<DetectedProject> {
+  const items = result.projects
+    .map((p) => ({
+      ...p,
+      cleanable: p.cleanable.filter((c) => c.size_bytes > 0),
+    }))
+    .filter((p) => p.cleanable.length > 0 && p.total_cleanable_bytes > 0)
+    .sort((a, b) => b.total_cleanable_bytes - a.total_cleanable_bytes);
+  return {
+    scanId: result.scan_id,
+    items,
+    scanErrors: result.scan_errors,
+    cancelled: result.cancelled,
+  };
 }
 
-const INITIAL_SCAN: ScanState = { scanId: null, projects: [], scanErrors: 0 };
+const sizeByPathFn = (projects: DetectedProject[]) => {
+  const map = new Map<string, number>();
+  for (const p of projects) for (const c of p.cleanable) map.set(c.path, c.size_bytes);
+  return map;
+};
 
 export function ProjectsPanel({ root, onPickFolder }: Props) {
-  const [scan, setScan] = useState<ScanState>(INITIAL_SCAN);
-  const [scanning, setScanning] = useState(false);
-  const [scanElapsedMs, setScanElapsedMs] = useState(0);
-  const [progress, setProgress] = useState<ScanProgress | null>(null);
-  const [cleaning, setCleaning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [results, setResults] = useState<CleanResult[] | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortMode>("size_desc");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [depth, setDepth] = useState<number>(DEFAULT_DEPTH);
   const [stackFilter, setStackFilter] = useState<string | null>(null);
-  // Monotonically increasing scan id used to drop stale results when the user
-  // rescans rapidly or switches roots mid-scan.
-  const scanIdRef = useRef(0);
 
-  // Aggregate stacks across all scanned projects with counts and totals.
+  const onScanStart = useCallback(() => setStackFilter(null), []);
+
+  const {
+    items: projects,
+    scanId,
+    scanErrors,
+    scanning,
+    scanElapsedMs,
+    progress,
+    cleaning,
+    error,
+    warning,
+    success,
+    results,
+    confirmOpen,
+    selected,
+    sizeByPath,
+    totalSelectedBytes,
+    runScan,
+    resetScan,
+    cancel,
+    toggle,
+    setSelected,
+    selectNone,
+    setConfirmOpen,
+    setResults,
+    performClean,
+  } = useCleanPanel<DetectedProject>({
+    kind: "projects",
+    sizeByPath: sizeByPathFn,
+    cleanedNoun: "location",
+    onScanStart,
+  });
+
+  const makeScan = useCallback(
+    (target: string, scanDepth: number) => async () =>
+      normalizeProjects(await scanProjects(target, scanDepth)),
+    [],
+  );
+
+  // Aggregate stacks across all scanned projects. `bytes` is the reclaimable
+  // total of projects that include the stack; for polyglot/monorepo projects a
+  // single project counts toward each of its stacks, so these per-stack totals
+  // can overlap and are not additive — the chip tooltip says so explicitly.
   const stackStats = useMemo(() => {
     const map = new Map<string, { count: number; bytes: number }>();
-    for (const p of scan.projects) {
+    for (const p of projects) {
       for (const s of p.stacks) {
         const entry = map.get(s) ?? { count: 0, bytes: 0 };
         entry.count += 1;
@@ -66,17 +121,18 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
     }
     return Array.from(map.entries())
       .map(([name, v]) => ({ name, ...v }))
-      .sort((a, b) => b.bytes - a.bytes);
-  }, [scan.projects]);
+      .sort((a, b) => b.count - a.count || b.bytes - a.bytes);
+  }, [projects]);
 
   const visibleProjects = useMemo(() => {
     const lowered = search.trim().toLowerCase();
-    let list = scan.projects.filter((p) => {
+    let list = projects.filter((p) => {
       if (stackFilter && !p.stacks.includes(stackFilter)) return false;
       if (!lowered) return true;
       return (
         p.name.toLowerCase().includes(lowered) ||
-        p.path.toLowerCase().includes(lowered)
+        p.path.toLowerCase().includes(lowered) ||
+        p.cleanable.some((c) => c.label.toLowerCase().includes(lowered))
       );
     });
     list = [...list];
@@ -86,24 +142,7 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
       return a.name.localeCompare(b.name);
     });
     return list;
-  }, [scan.projects, stackFilter, search, sort]);
-
-  // Sum of `size_bytes` per cleanable path across all loaded projects. Cached
-  // so totalSelectedBytes can be computed in O(selected) instead of scanning
-  // every visible row on every selection change.
-  const sizeByPath = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const p of scan.projects) {
-      for (const c of p.cleanable) map.set(c.path, c.size_bytes);
-    }
-    return map;
-  }, [scan.projects]);
-
-  const totalSelectedBytes = useMemo(() => {
-    let total = 0;
-    for (const path of selected) total += sizeByPath.get(path) ?? 0;
-    return total;
-  }, [selected, sizeByPath]);
+  }, [projects, stackFilter, search, sort]);
 
   const visibleCleanableCount = useMemo(
     () => visibleProjects.reduce((acc, p) => acc + p.cleanable.length, 0),
@@ -115,103 +154,20 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
     [visibleProjects],
   );
 
-  const runScan = useCallback(async (target: string) => {
-    const myId = ++scanIdRef.current;
-    setScanning(true);
-    setError(null);
-    setSuccess(null);
-    setResults(null);
-    setSelected(new Set());
-    setStackFilter(null);
-    setProgress(null);
-    const startedAt = performance.now();
-    setScanElapsedMs(0);
-    try {
-      const result = await scanProjects(target);
-      if (scanIdRef.current !== myId) return;
-      // Hide projects with nothing to reclaim, sort by size desc.
-      const filtered = result.projects
-        .map((p) => ({
-          ...p,
-          cleanable: p.cleanable.filter((c) => c.size_bytes > 0),
-        }))
-        .filter((p) => p.cleanable.length > 0 && p.total_cleanable_bytes > 0)
-        .sort((a, b) => b.total_cleanable_bytes - a.total_cleanable_bytes);
-      setScan({
-        scanId: result.scan_id,
-        projects: filtered,
-        scanErrors: result.scan_errors,
-      });
-      setScanElapsedMs(Math.round(performance.now() - startedAt));
-      if (result.cancelled) {
-        setError("Scan was cancelled; showing partial results.");
-      }
-    } catch (e) {
-      if (scanIdRef.current !== myId) return;
-      setError(String(e));
-    } finally {
-      if (scanIdRef.current === myId) {
-        setScanning(false);
-        setProgress(null);
-      }
-    }
-  }, []);
-
-  // Subscribe to scanner progress events once on mount; the unlisten function
-  // is returned synchronously by listen() once the channel is registered.
+  // Auto-scan whenever the selected root or scan depth changes.
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void onScanProgress("projects", (p) => {
-      if (!cancelled) setProgress(p);
-    }).then((u) => {
-      if (cancelled) u();
-      else unlisten = u;
-    });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, []);
-
-  const handleCancel = async () => {
-    try {
-      await cancelScan();
-    } catch {
-      // Cancel is best-effort; if it failed, the in-flight scan will still
-      // finish normally and the result handler will refresh state.
-    }
-  };
-
-  // Auto-scan whenever the selected root changes.
-  useEffect(() => {
-    if (root) {
-      void runScan(root);
-    } else {
-      scanIdRef.current++;
-      setScan(INITIAL_SCAN);
-    }
-  }, [root, runScan]);
-
-  const toggle = useCallback((path: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  }, []);
+    if (root) void runScan(makeScan(root, depth));
+    else resetScan();
+  }, [root, depth, runScan, resetScan, makeScan]);
 
   const selectAll = () => {
     setSelected(new Set(visibleProjects.flatMap((p) => p.cleanable.map((c) => c.path))));
   };
 
-  const selectNone = () => setSelected(new Set());
-
   // Items shown in the confirm dialog, indexed back to their project for context.
   const confirmItems = useMemo<CleanItem[]>(() => {
     const items: CleanItem[] = [];
-    for (const p of scan.projects) {
+    for (const p of projects) {
       for (const c of p.cleanable) {
         if (!selected.has(c.path)) continue;
         items.push({
@@ -226,49 +182,14 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
     }
     items.sort((a, b) => b.size_bytes - a.size_bytes);
     return items;
-  }, [scan.projects, selected]);
+  }, [projects, selected]);
 
-  const performClean = async () => {
-    if (selected.size === 0) return;
-    if (scan.scanId == null) {
-      setError("Scan results are stale; please re-scan before cleaning.");
-      return;
-    }
-    setConfirmOpen(false);
-    setCleaning(true);
-    setError(null);
-    setSuccess(null);
-    setResults(null);
-    const paths = Array.from(selected);
-    try {
-      const results = await cleanPaths(scan.scanId, paths);
-      const failures = results.filter((r) => !r.ok);
-      const succeeded = results.filter((r) => r.ok);
-      const freed = succeeded.reduce((acc, r) => acc + (sizeByPath.get(r.path) ?? 0), 0);
-
-      // Refresh first — runScan clears banners — then set status so they survive.
-      if (root) await runScan(root);
-
-      setResults(results);
-      if (succeeded.length > 0) {
-        setSuccess(
-          `Freed ${formatBytes(freed)} across ${succeeded.length} location${succeeded.length === 1 ? "" : "s"}.`,
-        );
-      }
-      if (failures.length > 0 && succeeded.length === 0) {
-        setError(`${failures.length} item(s) failed; expand the report below.`);
-      }
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setCleaning(false);
-    }
+  const onConfirmClean = () => {
+    if (root) void performClean(makeScan(root, depth));
   };
 
   const stackFilterCleared = (next: string | null) => {
-    if (selected.size > 0 && next !== stackFilter) {
-      setSelected(new Set());
-    }
+    if (selected.size > 0 && next !== stackFilter) selectNone();
     setStackFilter(next);
   };
 
@@ -280,19 +201,26 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
         </button>
         <button
           className="btn"
-          onClick={() => root && void runScan(root)}
+          onClick={() => root && void runScan(makeScan(root, depth))}
           disabled={!root || scanning}
         >
           {scanning ? "Scanning…" : "Re-scan"}
         </button>
         {scanning && (
-          <button
-            className="btn small"
-            onClick={() => void handleCancel()}
-            type="button"
-          >
+          <button className="btn small" onClick={() => void cancel()} type="button">
             Cancel
           </button>
+        )}
+        {root && (
+          <div className="sort-control">
+            <span className="sort-label">Depth</span>
+            <Dropdown
+              value={String(depth)}
+              options={DEPTH_OPTIONS}
+              onChange={(next) => setDepth(Number(next))}
+              aria-label="Scan depth"
+            />
+          </div>
         )}
         <span className="folder-path" title={root ?? ""}>
           {root ?? "No folder selected"}
@@ -307,7 +235,7 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
               : `Scanning ${root}… (${progress.scanned.toLocaleString()} entries)`
             : `Scanning ${root}…`
           : ""}
-        {!scanning && scan.scanId != null && !success && !error
+        {!scanning && scanId != null && !success && !error
           ? `Scan complete in ${(scanElapsedMs / 1000).toFixed(1)}s.`
           : ""}
       </div>
@@ -322,9 +250,14 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
           {error}
         </div>
       )}
-      {scan.scanErrors > 0 && (
+      {warning && (
         <div className="warning" role="status">
-          Some folders couldn’t be inspected ({scan.scanErrors} entr{scan.scanErrors === 1 ? "y" : "ies"} skipped). Totals may be conservative.
+          {warning}
+        </div>
+      )}
+      {scanErrors > 0 && (
+        <div className="warning" role="status">
+          Some folders couldn’t be inspected ({scanErrors} entr{scanErrors === 1 ? "y" : "ies"} skipped). Totals may be conservative.
         </div>
       )}
 
@@ -343,14 +276,14 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
             onClick={() => stackFilterCleared(null)}
             aria-pressed={stackFilter === null}
           >
-            All <span className="filter-count">{scan.projects.length}</span>
+            All <span className="filter-count">{projects.length}</span>
           </button>
           {stackStats.map((s) => (
             <button
               key={s.name}
               className={stackFilter === s.name ? "filter-chip active" : "filter-chip"}
               onClick={() => stackFilterCleared(s.name)}
-              title={`${formatBytes(s.bytes)} across ${s.count} project(s)`}
+              title={`${s.count} project${s.count === 1 ? "" : "s"} include ${s.name} • ${formatBytes(s.bytes)} reclaimable in them (may overlap other stacks)`}
               aria-pressed={stackFilter === s.name}
             >
               {s.name} <span className="filter-count">{s.count}</span>
@@ -359,12 +292,12 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
         </div>
       )}
 
-      {scan.projects.length > 0 && (
+      {projects.length > 0 && (
         <div className="controls-row">
           <input
             type="search"
             className="search-input"
-            placeholder="Filter by name or path"
+            placeholder="Filter by name, path, or folder"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search projects"
@@ -444,18 +377,18 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
         ))}
       </div>
 
-      {!scanning && root && scan.projects.length === 0 && (
+      {!scanning && root && projects.length === 0 && (
         <div className="empty-state">
           <p>Nothing cleanable found in this folder.</p>
           <p className="empty-hint">
             We look for build artifacts, dependency installs, and tool caches inside known
             stacks (Node, Rust, Python, Go, .NET, and more). If your stack is supported but
-            nothing turned up, the folder may be deeper than the scan depth.
+            nothing turned up, try increasing the scan depth above.
           </p>
         </div>
       )}
 
-      {!scanning && root && scan.projects.length > 0 && visibleProjects.length === 0 && (
+      {!scanning && root && projects.length > 0 && visibleProjects.length === 0 && (
         <div className="empty-state">
           <p>No projects match the current filter or search.</p>
         </div>
@@ -472,7 +405,7 @@ export function ProjectsPanel({ root, onPickFolder }: Props) {
         title="Clean selected project artifacts?"
         items={confirmItems}
         totalBytes={totalSelectedBytes}
-        onConfirm={performClean}
+        onConfirm={onConfirmClean}
         onCancel={() => setConfirmOpen(false)}
       />
     </section>

@@ -68,15 +68,18 @@ pub async fn scan_projects(
     let cancel = state.begin_scan();
     let cancel_clone = Arc::clone(&cancel);
     let progress = progress_emitter(app.clone(), "scan-projects:progress");
+    let size_cache = state.size_cache();
     let _ = app.emit("scan-projects:start", &root);
 
     let ProjectsScan {
         projects,
         scan_errors,
         cancelled,
-    } = spawn_blocking(move || stacks::scan_projects(&path, depth, cancel_clone, progress))
-        .await
-        .map_err(|e| e.to_string())?;
+    } = spawn_blocking(move || {
+        stacks::scan_projects(&path, depth, cancel_clone, progress, size_cache.as_ref())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     // Authorize every cleanable path we just produced. Anything outside this
     // session is rejected by `clean_paths`.

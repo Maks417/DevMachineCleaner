@@ -348,3 +348,13 @@ note = "Regenerated when you next install dependencies."
 name = "Deno"
 markers = ["deno.json", "deno.jsonc"]
 marker_exts = []
+
+[[stacks.cleanable]]
+name = "node_modules"
+category = "dependencies"
+note = "Regenerated when you next install dependencies."
+
+[[stacks.cleanable]]
+name = "vendor"
+category = "dependencies"
+note = "Re-created on the next `deno vendor` / cache."

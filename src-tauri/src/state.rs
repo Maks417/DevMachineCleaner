@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use crate::scanner::SizeCache;
+
 /// Number of recent scan sessions retained in memory. Older sessions are
 /// evicted on the next scan so a long-running app process does not accumulate
 /// a stale union of every path ever advertised. Each panel only needs the
@@ -32,9 +34,17 @@ pub struct AppState {
     sessions: Mutex<HashMap<u64, ScanSession>>,
     counter: AtomicU64,
     cancel: Mutex<Option<Arc<AtomicBool>>>,
+    /// Process-lifetime directory size cache shared across project scans so
+    /// repeat scans skip re-walking unchanged trees.
+    size_cache: Arc<SizeCache>,
 }
 
 impl AppState {
+    /// Shared directory size cache for project scans.
+    pub fn size_cache(&self) -> Arc<SizeCache> {
+        Arc::clone(&self.size_cache)
+    }
+
     /// Record a new scan session and return its id. The session id starts at
     /// 1 (never 0, so a defaulted/uninitialized client value is always
     /// rejected). Oldest sessions are evicted once `MAX_SESSIONS` is reached.
