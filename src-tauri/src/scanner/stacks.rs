@@ -140,6 +140,109 @@ fn detect_stacks_in(dir: &Path) -> (Vec<&'static StackRule>, bool) {
     (found, false)
 }
 
+/// Format a path relative to `root` using forward slashes for cross-platform UI.
+fn relative_path_display(root: &Path, child: &Path) -> String {
+    match child.strip_prefix(root) {
+        Ok(rel) => {
+            let rel_str = rel.to_string_lossy();
+            let trimmed = rel_str.trim_start_matches(['/', '\\']);
+            if trimmed.is_empty() {
+                String::new()
+            } else {
+                trimmed.replace('\\', "/")
+            }
+        }
+        Err(_) => child.to_string_lossy().into_owned(),
+    }
+}
+
+/// Fold detected projects nested inside another into the topmost ancestor.
+fn group_nested_projects(
+    hits: &[(PathBuf, Vec<&'static StackRule>)],
+    buckets: Vec<Vec<CleanableDir>>,
+) -> Vec<DetectedProject> {
+    let hit_count = hits.len();
+    if hit_count == 0 {
+        return Vec::new();
+    }
+
+    let mut roots: Vec<usize> = Vec::new();
+    let mut group_of: Vec<usize> = vec![0; hit_count];
+
+    let mut indices: Vec<usize> = (0..hit_count).collect();
+    indices.sort_by_key(|&i| hits[i].0.components().count());
+
+    for &idx in &indices {
+        let hit_path = &hits[idx].0;
+        let mut assigned = false;
+        for &root_idx in &roots {
+            if hit_path.starts_with(&hits[root_idx].0) {
+                group_of[idx] = root_idx;
+                assigned = true;
+                break;
+            }
+        }
+        if !assigned {
+            group_of[idx] = idx;
+            roots.push(idx);
+        }
+    }
+
+    roots.sort_by_key(|&root_idx| hits[root_idx].0.components().count());
+
+    roots
+        .into_iter()
+        .map(|root_idx| {
+            let (root_dir, _root_rules) = &hits[root_idx];
+            let root_path = std::path::absolute(root_dir).unwrap_or_else(|_| root_dir.clone());
+
+            let members: Vec<usize> = (0..hit_count)
+                .filter(|&i| group_of[i] == root_idx)
+                .collect();
+
+            let mut stacks: Vec<String> = Vec::new();
+            for &mi in &members {
+                for rule in &hits[mi].1 {
+                    if !stacks.contains(&rule.name) {
+                        stacks.push(rule.name.clone());
+                    }
+                }
+            }
+
+            let mut cleanable: Vec<CleanableDir> = Vec::new();
+            for &mi in &members {
+                let prefix = if mi == root_idx {
+                    String::new()
+                } else {
+                    relative_path_display(root_dir, &hits[mi].0)
+                };
+
+                for mut c in buckets[mi].clone() {
+                    if !prefix.is_empty() {
+                        c.label = format!("{prefix}/{}", c.label);
+                    }
+                    cleanable.push(c);
+                }
+            }
+
+            cleanable.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+            let total_cleanable_bytes: u64 = cleanable.iter().map(|c| c.size_bytes).sum();
+            let name = root_path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| root_path.to_string_lossy().into_owned());
+
+            DetectedProject {
+                path: root_path.to_string_lossy().into_owned(),
+                name,
+                stacks,
+                cleanable,
+                total_cleanable_bytes,
+            }
+        })
+        .collect()
+}
+
 /// Emit progress at most every PROGRESS_STRIDE discovery iterations to keep
 /// IPC noise low. Tuned so even a million-file root only emits a few hundred
 /// events.
@@ -298,26 +401,7 @@ pub fn scan_projects(
         buckets[idx].push(c);
     }
 
-    let projects: Vec<DetectedProject> = hits
-        .into_iter()
-        .zip(buckets)
-        .map(|((dir, rules), cleanable)| {
-            let stacks: Vec<String> = rules.iter().map(|r| r.name.clone()).collect();
-            let total: u64 = cleanable.iter().map(|c| c.size_bytes).sum();
-            let name = dir
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| dir.to_string_lossy().into_owned());
-            let normalized = std::path::absolute(&dir).unwrap_or(dir.clone());
-            DetectedProject {
-                path: normalized.to_string_lossy().into_owned(),
-                name,
-                stacks,
-                cleanable,
-                total_cleanable_bytes: total,
-            }
-        })
-        .collect();
+    let projects = group_nested_projects(&hits, buckets);
 
     ProjectsScan {
         projects,
@@ -346,6 +430,50 @@ mod tests {
 
     fn run_scan(root: &Path, depth: usize) -> ProjectsScan {
         scan_projects(root, depth, never_cancel(), no_progress())
+    }
+
+    #[test]
+    fn groups_monorepo_into_single_project() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("FlexibleHoursTracker");
+        mkdir(&root);
+        touch(&root.join("package.json"));
+        mkdir(&root.join("node_modules/pkg"));
+        fs::write(root.join("node_modules/pkg/index.js"), b"x").unwrap();
+        mkdir(&root.join(".turbo"));
+        fs::write(root.join(".turbo/cache"), b"x").unwrap();
+
+        let web = root.join("apps/web");
+        mkdir(&web);
+        touch(&web.join("package.json"));
+        mkdir(&web.join("node_modules/foo"));
+        fs::write(web.join("node_modules/foo/index.js"), b"x").unwrap();
+        mkdir(&web.join(".next"));
+        fs::write(web.join(".next/build"), b"x").unwrap();
+        mkdir(&web.join(".turbo"));
+        fs::write(web.join(".turbo/cache"), b"x").unwrap();
+
+        let scan = run_scan(tmp.path(), 6);
+        assert_eq!(
+            scan.projects.len(),
+            1,
+            "expected nested workspaces to fold into one project"
+        );
+        let p = &scan.projects[0];
+        assert_eq!(p.name, "FlexibleHoursTracker");
+        let labels: Vec<&str> = p.cleanable.iter().map(|c| c.label.as_str()).collect();
+        assert!(labels.contains(&"node_modules"), "labels: {labels:?}");
+        assert!(
+            labels.contains(&"apps/web/node_modules"),
+            "labels: {labels:?}"
+        );
+        assert!(labels.contains(&"apps/web/.next"), "labels: {labels:?}");
+        assert!(
+            p.total_cleanable_bytes > 0,
+            "expected non-zero total across grouped cleanables"
+        );
+        let sum: u64 = p.cleanable.iter().map(|c| c.size_bytes).sum();
+        assert_eq!(p.total_cleanable_bytes, sum);
     }
 
     #[test]

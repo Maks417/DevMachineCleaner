@@ -1,6 +1,6 @@
 [package]
 name = "dev-cleanup"
-version = "0.2.0"
+version = "0.3.0"
 description = "Reclaim disk space by cleaning dev build artifacts and AI caches"
 authors = ["Max Davydov"]
 edition = "2021"

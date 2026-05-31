@@ -7,6 +7,19 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-31
+
+### Added
+
+- **Monorepo project grouping.** Nested detected projects (e.g. a Turborepo root
+  plus `apps/web`) now fold into a single card under the topmost ancestor.
+  Cleanable rows show paths relative to the project root (`apps/web/.next`).
+
+### Changed
+
+- **Confirm dialog readability.** Overlay surfaces use near-opaque backgrounds
+  so modal content stays legible over busy scan results.
+
 ## [0.2.0] - 2026-05-26
 
 ### Added
