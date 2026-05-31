@@ -143,12 +143,34 @@ mod tests {
 
     #[test]
     fn size_cache_recomputes_after_direct_change() {
+        use std::time::{Duration, Instant};
+
         let tmp = tempfile::tempdir().unwrap();
         fs::write(tmp.path().join("a.bin"), vec![0u8; 1000]).unwrap();
         let cache = SizeCache::default();
+        let baseline = fs::metadata(tmp.path()).unwrap().modified().unwrap();
         assert_eq!(cache.measure(tmp.path()).bytes, 1000);
-        // Adding a direct child changes the dir's mtime, invalidating the cache.
+
+        // Adding a direct child makes the cached size stale, but the cache only
+        // notices once the directory's mtime advances. Filesystem timestamp
+        // granularity varies (sub-second on ext4/NTFS, up to 2s on FAT), so a
+        // single write can land in the same tick as the baseline and leave the
+        // mtime unchanged. Touch the directory until the kernel reports a newer
+        // mtime instead of racing a single write (the original cause of the
+        // flaky CI failure).
         fs::write(tmp.path().join("b.bin"), vec![0u8; 500]).unwrap();
+        let nudge = tmp.path().join("nudge.tmp");
+        let start = Instant::now();
+        while fs::metadata(tmp.path()).unwrap().modified().unwrap() == baseline {
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "directory mtime never advanced after a direct change"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+            fs::write(&nudge, b"x").unwrap();
+            fs::remove_file(&nudge).unwrap();
+        }
+
         assert_eq!(cache.measure(tmp.path()).bytes, 1500);
     }
 }
