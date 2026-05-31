@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Developer Machine Cleaner  reclaim disk space from dev artifacts and AI caches">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0d14"/>
+      <stop offset="100%" stop-color="#11141d"/>
+    </linearGradient>
+    <radialGradient id="blob1" cx="20%" cy="15%" r="50%">
+      <stop offset="0%" stop-color="#7c9bff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#7c9bff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blob2" cx="85%" cy="80%" r="45%">
+      <stop offset="0%" stop-color="#b388ff" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#b388ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="icon-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3e58d6"/>
+      <stop offset="100%" stop-color="#0f1e4e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#blob1)"/>
+  <rect width="1200" height="630" fill="url(#blob2)"/>
+  <rect x="80" y="165" width="120" height="120" rx="26" fill="url(#icon-bg)"/>
+  <polygon points="140,195 155,225 185,225 160,245 170,275 140,255 110,275 120,245 95,225 125,225" fill="rgba(255,255,255,0.95)"/>
+  <text x="230" y="210" fill="#f2f4f8" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="700">Developer Machine Cleaner</text>
+  <text x="230" y="270" fill="rgba(242,244,248,0.62)" font-family="system-ui, -apple-system, sans-serif" font-size="28">Reclaim disk space from dev artifacts &amp; AI caches</text>
+  <text x="230" y="320" fill="#7c9bff" font-family="system-ui, -apple-system, sans-serif" font-size="22">Windows · macOS · Linux · Recoverable via Trash</text>
+</svg>

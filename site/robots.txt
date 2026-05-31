@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://maks417.github.io/DevMachineCleaner/sitemap.xml

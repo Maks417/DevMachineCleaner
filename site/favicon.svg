@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Developer Machine Cleaner">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3e58d6"/>
+      <stop offset="100%" stop-color="#0f1e4e"/>
+    </linearGradient>
+    <radialGradient id="warm" cx="28%" cy="22%" r="55%">
+      <stop offset="0%" stop-color="#b48cff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#b48cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cool" cx="82%" cy="88%" r="65%">
+      <stop offset="0%" stop-color="#50dcff" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#50dcff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <rect width="64" height="64" rx="14" fill="url(#warm)"/>
+  <rect width="64" height="64" rx="14" fill="url(#cool)"/>
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <polygon points="32,14 38,26 50,26 40,34 44,46 32,38 20,46 24,34 14,26 26,26" fill="rgba(255,255,255,0.95)"/>
+  <polygon points="46,18 48,22 52,22 49,24 50,28 46,26 42,28 43,24 40,22 44,22" fill="rgba(255,255,255,0.85)"/>
+  <polygon points="18,44 19,47 22,47 20,49 21,52 18,50 15,52 16,49 14,47 17,47" fill="rgba(255,255,255,0.7)"/>
+</svg>

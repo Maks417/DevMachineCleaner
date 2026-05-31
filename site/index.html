@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer Machine Cleaner — Reclaim disk space from dev artifacts &amp; AI caches</title>
+  <meta name="description" content="Cross-platform desktop app that reclaims disk space by cleaning developer build artifacts and AI/LLM caches. Everything goes to the OS Recycle Bin — fully recoverable.">
+  <meta name="author" content="Max Davydov">
+  <meta name="theme-color" content="#0b0d14">
+  <link rel="canonical" href="https://maks417.github.io/DevMachineCleaner/">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://maks417.github.io/DevMachineCleaner/">
+  <meta property="og:title" content="Developer Machine Cleaner">
+  <meta property="og:description" content="Cross-platform desktop app that reclaims disk space by cleaning developer build artifacts and AI/LLM caches. Everything goes to the OS Recycle Bin — fully recoverable.">
+  <meta property="og:image" content="https://maks417.github.io/DevMachineCleaner/og-image.svg">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Developer Machine Cleaner">
+  <meta name="twitter:description" content="Cross-platform desktop app that reclaims disk space by cleaning developer build artifacts and AI/LLM caches.">
+  <meta name="twitter:image" content="https://maks417.github.io/DevMachineCleaner/og-image.svg">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <div class="container">
+        <a class="brand" href="#top" aria-label="Developer Machine Cleaner home">
+          <svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true">
+            <defs>
+              <linearGradient id="logo-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#3e58d6"/>
+                <stop offset="100%" stop-color="#0f1e4e"/>
+              </linearGradient>
+            </defs>
+            <rect width="64" height="64" rx="14" fill="url(#logo-bg)"/>
+            <polygon points="32,14 38,26 50,26 40,34 44,46 32,38 20,46 24,34 14,26 26,26" fill="rgba(255,255,255,0.95)"/>
+          </svg>
+          <span>Dev Machine Cleaner</span>
+        </a>
+        <nav class="nav" aria-label="Main">
+          <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#stacks">Stacks</a>
+            <a href="#safety">Safety</a>
+            <a href="#download">Download</a>
+          </div>
+          <a class="btn btn-sm btn-primary" href="https://github.com/Maks417/DevMachineCleaner/releases">Download</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="container hero-grid">
+          <div class="hero-content">
+            <h1>Developer Machine Cleaner</h1>
+            <p class="tagline">
+              Reclaim gigabytes from abandoned <code>node_modules</code>, Rust <code>target/</code>,
+              Python <code>.venv</code>, and AI model caches — with one click. Everything goes to
+              the Recycle Bin / Trash. Fully recoverable.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://github.com/Maks417/DevMachineCleaner/releases">Download latest release</a>
+              <a class="btn" href="https://github.com/Maks417/DevMachineCleaner">View on GitHub</a>
+            </div>
+            <div class="platform-badges" aria-label="Supported platforms">
+              <span class="badge">Windows</span>
+              <span class="badge">macOS (Apple Silicon)</span>
+              <span class="badge">Linux</span>
+            </div>
+            <div class="shields">
+              <a href="https://github.com/Maks417/DevMachineCleaner/actions/workflows/ci.yml">
+                <img src="https://github.com/Maks417/DevMachineCleaner/actions/workflows/ci.yml/badge.svg" alt="CI status" width="88" height="20">
+              </a>
+              <a href="https://github.com/Maks417/DevMachineCleaner/actions/workflows/release.yml">
+                <img src="https://github.com/Maks417/DevMachineCleaner/actions/workflows/release.yml/badge.svg" alt="Release status" width="88" height="20">
+              </a>
+              <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" width="88" height="20">
+              <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&amp;logoColor=white" alt="Tauri 2" width="88" height="20">
+            </div>
+          </div>
+
+          <div class="mockup-wrap">
+            <!-- Replace mockup with a real screenshot: add screenshot.png and uncomment rules in styles.css -->
+            <!-- <img class="mockup-screenshot-slot" src="screenshot.png" alt="Developer Machine Cleaner app screenshot" width="640" height="400"> -->
+            <div class="mockup-frame" role="img" aria-label="App interface preview">
+              <div class="mockup-titlebar">
+                <span class="mockup-dot"></span>
+                <span class="mockup-dot"></span>
+                <span class="mockup-dot"></span>
+                <span class="mockup-title">Developer Machine Cleaner</span>
+              </div>
+              <div class="mockup-body">
+                <aside class="mockup-sidebar">
+                  <div class="mockup-tab active">Projects</div>
+                  <div class="mockup-tab">AI Caches</div>
+                </aside>
+                <div class="mockup-main">
+                  <div class="mockup-bar">
+                    <span class="mockup-chip active">All</span>
+                    <span class="mockup-chip">Node.js</span>
+                    <span class="mockup-chip">Rust</span>
+                    <span class="mockup-chip">Python</span>
+                  </div>
+                  <div class="mockup-summary">
+                    <span>3 projects · <strong>12.4 GB</strong> reclaimable</span>
+                    <span style="color: var(--danger); font-weight: 600;">Clean</span>
+                  </div>
+                  <div class="mockup-row">
+                    <span class="mockup-check" aria-hidden="true"></span>
+                    <div class="mockup-row-info">
+                      <div class="mockup-row-name">my-saas-app</div>
+                      <div class="mockup-row-path">node_modules · dependencies</div>
+                    </div>
+                    <span class="mockup-row-size">4.2 GB</span>
+                  </div>
+                  <div class="mockup-row">
+                    <span class="mockup-check" aria-hidden="true"></span>
+                    <div class="mockup-row-info">
+                      <div class="mockup-row-name">api-server</div>
+                      <div class="mockup-row-path">target · build output</div>
+                    </div>
+                    <span class="mockup-row-size">3.8 GB</span>
+                  </div>
+                  <div class="mockup-row">
+                    <span class="mockup-check" aria-hidden="true"></span>
+                    <div class="mockup-row-info">
+                      <div class="mockup-row-name">ml-pipeline</div>
+                      <div class="mockup-row-path">.venv · dependencies</div>
+                    </div>
+                    <span class="mockup-row-size">4.4 GB</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section class="section" id="features">
+        <div class="container">
+          <header class="section-header">
+            <h2>Everything you need to clean safely</h2>
+            <p>Scan, review, and reclaim space without guessing what gets deleted.</p>
+          </header>
+          <div class="card-grid">
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">📁</div>
+              <h3>Project scanning</h3>
+              <p>Point it at any folder. It walks subdirectories, detects stacks by marker files, and reports cleanable directories with exact sizes.</p>
+            </article>
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">🤖</div>
+              <h3>AI cache scanning</h3>
+              <p>Finds known cache locations for HuggingFace, Ollama, PyTorch, Cursor, Claude, and more — without touching settings or conversations.</p>
+            </article>
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">🏷️</div>
+              <h3>Category tags</h3>
+              <p>Every item is tagged — dependencies, build output, cache, model weights, logs — so you know what redownloads vs what regenerates locally.</p>
+            </article>
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">🔍</div>
+              <h3>Filter, search &amp; sort</h3>
+              <p>Slice results by stack or cache type, search by name or path, and sort by size or name before cleaning.</p>
+            </article>
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">✅</div>
+              <h3>In-app confirmation</h3>
+              <p>Review total bytes, per-item paths, category breakdown, and a recoverability reminder before any delete.</p>
+            </article>
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">📊</div>
+              <h3>Post-clean report</h3>
+              <p>Expandable success/failure list per path so you can verify exactly what happened.</p>
+            </article>
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">⏱️</div>
+              <h3>Cancellable scans</h3>
+              <p>Cancel mid-scan with live progress — scanned-entry counters and elapsed time while you wait.</p>
+            </article>
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">🔒</div>
+              <h3>Session-safe deletion</h3>
+              <p>Each scan returns a session id. Only paths from that session are accepted — stale or synthesized paths are rejected.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Supported stacks & caches -->
+      <section class="section" id="stacks">
+        <div class="container">
+          <header class="section-header">
+            <h2>Supported stacks &amp; caches</h2>
+            <p>Detects projects by stack markers and scans well-known AI tool cache locations.</p>
+          </header>
+          <div class="glass-panel">
+            <div class="chip-section">
+              <h3>Project stacks</h3>
+              <div class="chip-list">
+                <span class="chip">Node.js</span>
+                <span class="chip">Rust</span>
+                <span class="chip">Python</span>
+                <span class="chip">Go</span>
+                <span class="chip">Java / Maven</span>
+                <span class="chip">Java / Gradle</span>
+                <span class="chip">.NET</span>
+                <span class="chip">Flutter / Dart</span>
+                <span class="chip">Xcode</span>
+                <span class="chip">PHP / Composer</span>
+                <span class="chip">Ruby / Bundler</span>
+                <span class="chip">Swift / SPM</span>
+                <span class="chip">Terraform</span>
+                <span class="chip">CMake</span>
+                <span class="chip">Bun</span>
+                <span class="chip">Deno</span>
+              </div>
+            </div>
+            <div class="chip-section">
+              <h3>AI &amp; dev tool caches</h3>
+              <div class="chip-list">
+                <span class="chip">HuggingFace</span>
+                <span class="chip">Ollama</span>
+                <span class="chip">PyTorch</span>
+                <span class="chip">TensorFlow / Keras</span>
+                <span class="chip">Diffusers</span>
+                <span class="chip">OpenAI Triton</span>
+                <span class="chip">NVIDIA compute cache</span>
+                <span class="chip">LM Studio</span>
+                <span class="chip">Jan</span>
+                <span class="chip">GPT4All</span>
+                <span class="chip">Cursor</span>
+                <span class="chip">VS Code</span>
+                <span class="chip">Windsurf</span>
+                <span class="chip">Claude Desktop</span>
+                <span class="chip">Claude Code</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Safety -->
+      <section class="section" id="safety">
+        <div class="container">
+          <header class="section-header">
+            <h2>Built for safety</h2>
+            <p>Conservative by design — nothing is permanently deleted, and only advertised paths are accepted.</p>
+          </header>
+          <div class="safety-grid">
+            <div class="safety-item">
+              <div class="safety-icon" aria-hidden="true">♻️</div>
+              <div>
+                <h3>Recycle Bin only</h3>
+                <p>Everything goes through the OS Recycle Bin / Trash. Restore anything you didn't mean to remove.</p>
+              </div>
+            </div>
+            <div class="safety-item">
+              <div class="safety-icon" aria-hidden="true">🎫</div>
+              <div>
+                <h3>Session-id allowlist</h3>
+                <p>Each scan produces a session id. The cleaner accepts only paths advertised during that specific scan.</p>
+              </div>
+            </div>
+            <div class="safety-item">
+              <div class="safety-icon" aria-hidden="true">🔗</div>
+              <div>
+                <h3>No symlink deletion</h3>
+                <p>Symlinks and Windows junctions are refused so deleting a link never affects its target.</p>
+              </div>
+            </div>
+            <div class="safety-item">
+              <div class="safety-icon" aria-hidden="true">🛡️</div>
+              <div>
+                <h3>Conservative AI paths</h3>
+                <p>Only volatile cache directories — never configuration, extensions, or conversation history.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Download -->
+      <section class="section" id="download">
+        <div class="container">
+          <header class="section-header">
+            <h2>Download</h2>
+            <p>Prebuilt bundles for Windows, macOS, and Linux — published on GitHub Releases.</p>
+          </header>
+          <div class="glass-panel">
+            <table class="download-table">
+              <thead>
+                <tr>
+                  <th scope="col">Platform</th>
+                  <th scope="col">Artifact</th>
+                  <th scope="col"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Windows</td>
+                  <td><code>.msi</code> installer or <code>.exe</code> (NSIS)</td>
+                  <td><a href="https://github.com/Maks417/DevMachineCleaner/releases">Download</a></td>
+                </tr>
+                <tr>
+                  <td>macOS (Apple Silicon)</td>
+                  <td><code>.dmg</code> (<code>aarch64</code>)</td>
+                  <td><a href="https://github.com/Maks417/DevMachineCleaner/releases">Download</a></td>
+                </tr>
+                <tr>
+                  <td>Linux</td>
+                  <td><code>.AppImage</code> or <code>.deb</code></td>
+                  <td><a href="https://github.com/Maks417/DevMachineCleaner/releases">Download</a></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="note">
+              <strong>Unsigned builds:</strong> Windows SmartScreen and macOS Gatekeeper will warn on first launch.
+              Right-click → Open (macOS) or "More info → Run anyway" (Windows). Code signing is on the roadmap.
+              Intel Mac users: build from source — see below.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Build from source -->
+      <section class="section" id="build">
+        <div class="container">
+          <header class="section-header">
+            <h2>Build from source</h2>
+            <p>Node.js 20+, Rust stable, and Tauri 2 OS-specific prerequisites.</p>
+          </header>
+          <div class="code-block">
+            <pre><span class="comment"># Clone and run in dev mode</span>
+git clone https://github.com/Maks417/DevMachineCleaner.git
+cd DevMachineCleaner
+npm install
+npm run tauri dev      <span class="comment"># dev mode</span>
+npm run tauri build    <span class="comment"># release bundle for your OS</span></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="brand" href="#top">
+              <svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true">
+                <defs>
+                  <linearGradient id="footer-logo-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#3e58d6"/>
+                    <stop offset="100%" stop-color="#0f1e4e"/>
+                  </linearGradient>
+                </defs>
+                <rect width="64" height="64" rx="14" fill="url(#footer-logo-bg)"/>
+                <polygon points="32,14 38,26 50,26 40,34 44,46 32,38 20,46 24,34 14,26 26,26" fill="rgba(255,255,255,0.95)"/>
+              </svg>
+              <span>Developer Machine Cleaner</span>
+            </a>
+            <p>Cross-platform desktop app built with Tauri 2, React 19, and Rust.</p>
+          </div>
+          <nav class="footer-links" aria-label="Footer">
+            <a href="https://github.com/Maks417/DevMachineCleaner">GitHub</a>
+            <a href="https://github.com/Maks417/DevMachineCleaner/releases">Releases</a>
+            <a href="https://github.com/Maks417/DevMachineCleaner/issues">Issues</a>
+            <a href="https://github.com/Maks417/DevMachineCleaner/blob/main/SECURITY.md">Security</a>
+            <a href="https://github.com/Maks417/DevMachineCleaner/blob/main/CHANGELOG.md">Changelog</a>
+            <a href="https://github.com/Maks417/DevMachineCleaner/blob/main/LICENSE">MIT License</a>
+          </nav>
+        </div>
+        <p class="footer-copy">MIT © 2026 Max Davydov</p>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,743 @@
+/* ---------- design tokens (liquid-glass, dark) — mirrors src/App.css ---------- */
+:root {
+  --bg-0: #0b0d14;
+  --bg-1: #11141d;
+
+  --glass-1: rgba(255, 255, 255, 0.04);
+  --glass-2: rgba(255, 255, 255, 0.07);
+  --glass-3: rgba(255, 255, 255, 0.10);
+  --glass-strong: rgba(255, 255, 255, 0.14);
+
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #f2f4f8;
+  --text-dim: rgba(242, 244, 248, 0.62);
+  --text-faint: rgba(242, 244, 248, 0.42);
+
+  --accent: #7c9bff;
+  --accent-2: #b388ff;
+  --accent-glow: rgba(124, 155, 255, 0.42);
+  --danger: #ff6b7a;
+  --success: #5ee2a0;
+
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.10) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 16px 48px rgba(0, 0, 0, 0.4);
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  --max-width: 1120px;
+  --header-height: 64px;
+
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: var(--bg-0);
+  line-height: 1.6;
+}
+
+/* ---------- ambient backdrop ---------- */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  background:
+    radial-gradient(60% 50% at 20% 10%, rgba(124, 155, 255, 0.35), transparent 60%),
+    radial-gradient(45% 50% at 90% 90%, rgba(179, 136, 255, 0.30), transparent 60%),
+    radial-gradient(50% 60% at 70% 20%, rgba(94, 226, 200, 0.18), transparent 60%);
+  filter: blur(4px);
+}
+
+body::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.55));
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* ---------- layout ---------- */
+.page {
+  position: relative;
+  z-index: 1;
+}
+
+.container {
+  width: min(100% - 32px, var(--max-width));
+  margin-inline: auto;
+}
+
+.section {
+  padding: 72px 0;
+}
+
+.section-header {
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.section-header h2 {
+  margin: 0 0 12px;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.section-header p {
+  margin: 0 auto;
+  max-width: 560px;
+  color: var(--text-dim);
+  font-size: 1.05rem;
+}
+
+/* ---------- header ---------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--header-height);
+  border-bottom: 1px solid var(--hairline);
+  background: rgba(11, 13, 20, 0.72);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.site-header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  gap: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-weight: 650;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav a {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.nav a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .nav-links {
+    display: none;
+  }
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  background: var(--glass-2);
+  box-shadow: var(--shadow-1);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 550;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.btn:hover {
+  background: var(--glass-3);
+  border-color: rgba(255, 255, 255, 0.22);
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, rgba(124, 155, 255, 0.35), rgba(179, 136, 255, 0.25));
+  border-color: rgba(124, 155, 255, 0.45);
+  box-shadow: var(--shadow-1), 0 0 24px var(--accent-glow);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, rgba(124, 155, 255, 0.48), rgba(179, 136, 255, 0.35));
+  border-color: rgba(124, 155, 255, 0.65);
+}
+
+.btn-sm {
+  padding: 7px 14px;
+  font-size: 0.8125rem;
+}
+
+/* ---------- hero ---------- */
+.hero {
+  padding: 56px 0 80px;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+@media (max-width: 860px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+.hero-content h1 {
+  margin: 0 0 16px;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.hero-content .tagline {
+  margin: 0 0 28px;
+  font-size: clamp(1.05rem, 2vw, 1.2rem);
+  color: var(--text-dim);
+  max-width: 480px;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.platform-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--glass-1);
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+}
+
+.shields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shields img {
+  height: 20px;
+  border-radius: 4px;
+}
+
+/* ---------- app mockup ---------- */
+.mockup-wrap {
+  position: relative;
+}
+
+.mockup-frame {
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-lg);
+  background: var(--glass-1);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.mockup-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--glass-2);
+}
+
+.mockup-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--hairline-strong);
+}
+
+.mockup-dot:nth-child(1) { background: #ff6b7a; }
+.mockup-dot:nth-child(2) { background: #ffd166; }
+.mockup-dot:nth-child(3) { background: #5ee2a0; }
+
+.mockup-title {
+  margin-left: 8px;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+.mockup-body {
+  display: flex;
+  min-height: 320px;
+}
+
+.mockup-sidebar {
+  width: 140px;
+  flex-shrink: 0;
+  padding: 16px 12px;
+  border-right: 1px solid var(--hairline);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.mockup-tab {
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+.mockup-tab.active {
+  background: var(--glass-3);
+  color: var(--text);
+  border: 1px solid var(--hairline);
+}
+
+.mockup-main {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mockup-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mockup-chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline);
+  background: var(--glass-1);
+  color: var(--text-faint);
+  font-size: 0.6875rem;
+}
+
+.mockup-chip.active {
+  border-color: rgba(124, 155, 255, 0.45);
+  color: var(--accent);
+  background: rgba(124, 155, 255, 0.12);
+}
+
+.mockup-summary {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline);
+  background: var(--glass-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.mockup-summary strong {
+  color: var(--accent);
+}
+
+.mockup-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline);
+  background: var(--glass-1);
+  font-size: 0.6875rem;
+}
+
+.mockup-check {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(124, 155, 255, 0.5);
+  background: rgba(124, 155, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.mockup-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mockup-row-name {
+  color: var(--text);
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mockup-row-path {
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mockup-row-size {
+  color: var(--accent);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.mockup-screenshot-slot {
+  display: none;
+}
+
+/*
+  To use a real screenshot instead of the CSS mockup:
+  1. Add screenshot.png to site/
+  2. Uncomment the rules below and hide .mockup-frame
+*/
+/*
+.mockup-screenshot-slot {
+  display: block;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline-strong);
+  box-shadow: var(--shadow-2);
+}
+.mockup-frame { display: none; }
+*/
+
+/* ---------- cards ---------- */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  padding: 24px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--glass-1);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.card-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(124, 155, 255, 0.15);
+  color: var(--accent);
+  font-size: 1.25rem;
+}
+
+.card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.card p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+/* ---------- chips ---------- */
+.chip-section {
+  margin-bottom: 32px;
+}
+
+.chip-section:last-child {
+  margin-bottom: 0;
+}
+
+.chip-section h3 {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--glass-1);
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+}
+
+/* ---------- safety ---------- */
+.safety-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.safety-item {
+  display: flex;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--glass-1);
+}
+
+.safety-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(94, 226, 160, 0.12);
+  color: var(--success);
+  font-size: 1.1rem;
+}
+
+.safety-item h3 {
+  margin: 0 0 4px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.safety-item p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+}
+
+/* ---------- download table ---------- */
+.glass-panel {
+  padding: 28px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--glass-1);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.download-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.download-table th,
+.download-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.download-table th {
+  color: var(--text-dim);
+  font-weight: 550;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.download-table tr:last-child td {
+  border-bottom: none;
+}
+
+.download-table td:first-child {
+  font-weight: 550;
+}
+
+.note {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 107, 122, 0.25);
+  background: rgba(255, 107, 122, 0.08);
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+}
+
+.note strong {
+  color: var(--danger);
+}
+
+/* ---------- code block ---------- */
+.code-block {
+  position: relative;
+  padding: 20px 24px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.35);
+  overflow-x: auto;
+}
+
+.code-block pre {
+  margin: 0;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+.code-block .comment {
+  color: var(--text-faint);
+}
+
+/* ---------- footer ---------- */
+.site-footer {
+  padding: 48px 0;
+  border-top: 1px solid var(--hairline);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.footer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.footer-brand p {
+  margin: 8px 0 0;
+  color: var(--text-faint);
+  font-size: 0.8125rem;
+  max-width: 280px;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.footer-links a {
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: var(--text);
+}
+
+.footer-copy {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  text-align: center;
+}
