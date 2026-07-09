@@ -201,6 +201,11 @@
               <h3>Session-safe deletion</h3>
               <p>Each scan returns a session id. Only paths from that session are accepted — stale or synthesized paths are rejected.</p>
             </article>
+            <article class="card">
+              <div class="card-icon" aria-hidden="true">🔄</div>
+              <h3>Automatic updates</h3>
+              <p>Checks GitHub Releases on launch and installs newer builds in place — each update is minisign-verified before it runs. Or hit "Check for updates" any time.</p>
+            </article>
           </div>
         </div>
       </section>
@@ -336,6 +341,11 @@
               <strong>Unsigned builds:</strong> Windows SmartScreen and macOS Gatekeeper will warn on first launch.
               Right-click → Open (macOS) or "More info → Run anyway" (Windows). Code signing is on the roadmap.
               Intel Mac users: build from source — see below.
+            </p>
+            <p class="note">
+              <strong>Updates are verified:</strong> once installed, the app updates itself automatically from
+              GitHub Releases. Update bundles are cryptographically signed (minisign) and verified before install,
+              even though the installers themselves aren't OS-code-signed yet.
             </p>
           </div>
         </div>
