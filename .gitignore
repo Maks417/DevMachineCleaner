@@ -13,6 +13,12 @@ dist-ssr
 *.local
 docs/
 
+# Tauri updater signing keys — the private key must never be committed.
+# Public half goes in tauri.conf.json (plugins.updater.pubkey); private half
+# lives only in GitHub Actions secrets (TAURI_SIGNING_PRIVATE_KEY).
+*.key
+*.key.pub
+
 # Editor / tooling directories
 .vscode
 .claude

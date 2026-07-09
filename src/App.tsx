@@ -3,6 +3,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import { ProjectsPanel } from "./components/ProjectsPanel";
 import { AiCachesPanel } from "./components/AiCachesPanel";
+import { UpdateBanner } from "./components/UpdateBanner";
+import { useUpdater } from "./lib/useUpdater";
 import "./App.css";
 
 type Tab = "projects" | "ai";
@@ -16,6 +18,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("projects");
   const [root, setRoot] = useState<string | null>(null);
   const [version, setVersion] = useState<string>("");
+  const updater = useUpdater();
 
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +33,13 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // Silently check for a newer release once on launch; offline / same-version
+  // outcomes stay quiet (see useUpdater). Runs once — the checkForUpdate
+  // identity is stable across renders.
+  useEffect(() => {
+    void updater.checkForUpdate({ silent: true });
+  }, [updater.checkForUpdate]);
 
   const pickFolder = async () => {
     const selected = await open({ directory: true, multiple: false });
@@ -72,6 +82,31 @@ export default function App() {
           <span className="app-footer-note">
             Cleaned items are moved to your OS Recycle Bin / Trash — you can restore them.
           </span>
+          <div className="app-footer-update">
+            {updater.status === "checking" && (
+              <span className="app-update-status">Checking…</span>
+            )}
+            {updater.status === "uptodate" && (
+              <span className="app-update-status">Up to date</span>
+            )}
+            {updater.status === "error" && !updater.update && (
+              <span className="app-update-status app-update-status-error">
+                Check failed
+              </span>
+            )}
+            <button
+              className="btn small"
+              type="button"
+              onClick={() => void updater.checkForUpdate({ silent: false })}
+              disabled={
+                updater.status === "checking" ||
+                updater.status === "downloading" ||
+                updater.status === "ready"
+              }
+            >
+              Check for updates
+            </button>
+          </div>
           {version && (
             <span className="app-version" title="Developer Machine Cleaner version">
               v{version}
@@ -79,6 +114,16 @@ export default function App() {
           )}
         </footer>
       </div>
+
+      <UpdateBanner
+        status={updater.status}
+        update={updater.update}
+        downloaded={updater.downloaded}
+        contentLength={updater.contentLength}
+        error={updater.error}
+        onInstall={() => void updater.downloadAndInstall()}
+        onDismiss={updater.dismiss}
+      />
     </div>
   );
 }
