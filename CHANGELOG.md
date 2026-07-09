@@ -7,6 +7,20 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-09
+
+### Added
+
+- **Automatic updates.** The app checks GitHub Releases on launch and offers a
+  one-click, in-place update; a manual **Check for updates** button lives in the
+  footer. Update bundles are minisign-signed and signature-verified before
+  install, and the app relaunches into the new version.
+
+### Internal
+
+- Dependency updates across Tauri, Vite, and the testing libraries via
+  Dependabot, plus a bump of `tauri-apps/tauri-action` in the release workflow.
+
 ## [0.4.0] - 2026-05-31
 
 ### Added
