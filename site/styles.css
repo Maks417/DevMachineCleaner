@@ -740,4 +740,45 @@ svg {
   color: var(--text-faint);
   font-size: 0.75rem;
   text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.footer-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.footer-author-name {
+  letter-spacing: 0.01em;
+}
+
+.footer-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  color: var(--accent);
+  opacity: 0.9;
+  transition: color 0.2s, opacity 0.2s, transform 0.2s;
+}
+
+.footer-icon-link:hover {
+  color: var(--text);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.footer-icon {
+  width: 14px;
+  height: 14px;
+  max-width: 14px;
+  max-height: 14px;
+  flex-shrink: 0;
+  display: block;
 }
