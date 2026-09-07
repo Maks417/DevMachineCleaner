@@ -118,7 +118,7 @@ The CI workflow runs the same set on every PR.
 ## Tech stack
 
 - **Shell:** [Tauri 2](https://tauri.app/) — Rust backend, system WebView frontend
-- **UI:** React 19 + TypeScript 5.8 + Vite 7
+- **UI:** React 19 + TypeScript 7 + Vite 8
 - **Rust crates:** `walkdir`, `rayon` (parallel sizing), `trash`, `dirs`, `serde`
 - **Tauri plugins:** `tauri-plugin-dialog` (folder picker)
 
